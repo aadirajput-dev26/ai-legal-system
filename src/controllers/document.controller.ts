@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { GtwyService } from '../services/gtwy.service.js';
+import { CaseRepository } from '../repositories/case.repository.js';
 
 export const createDocument = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const caseId = req.params.id;
@@ -8,6 +9,10 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
     let contentOrUrl: string = '';
     let isUrl = false;
     
+    const caseObj = await CaseRepository.findById(caseId);
+    if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+    const targetCollectionId = caseObj.collection_id || caseId;
+
     if (req.isMultipart()) {
         const parts = req.parts();
         let fileBuffer: Buffer | null = null;
@@ -57,7 +62,7 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
     }
 
     try {
-        const resource = await GtwyService.createResource(caseId, title, contentOrUrl, isUrl);
+        const resource = await GtwyService.createResource(targetCollectionId, title, contentOrUrl, isUrl);
         return reply.status(201).send({ success: true, resource });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
@@ -67,7 +72,10 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
 export const listDocuments = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
         const caseId = req.params.id;
-        const data = await GtwyService.getResourcesByCase(caseId);
+        const caseObj = await CaseRepository.findById(caseId);
+        if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+        
+        const data = await GtwyService.getResourcesByCase(caseObj.collection_id || caseId);
         return reply.send(data);
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });

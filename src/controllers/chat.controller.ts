@@ -37,7 +37,13 @@ export const getChatHistory = async (req: FastifyRequest<{ Params: { id: string,
         if (!chat) return reply.status(404).send({ error: 'Chat not found' });
 
         const history = await GtwyService.getThreadHistory(UNIVERSAL_AGENT_ID, chatId);
-        return reply.send(history);
+        // Format history for the client. The frontend expects res.data to be an array of { role, content }
+        const messages = Array.isArray(history) ? history : (history.data || history.messages || []);
+        const formattedMessages = messages.map((m: any) => ({
+            role: m.role || (m.type === 'human' ? 'user' : 'assistant'),
+            content: m.content || m.text || ''
+        }));
+        return reply.send({ success: true, data: formattedMessages });
     } catch (error: any) {
         return reply.status(500).send({ error: error.message });
     }

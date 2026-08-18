@@ -60,8 +60,8 @@ export class GtwyService {
         return response.json();
     }
 
-    static async getResourcesByCase(caseId: string) {
-        const response = await fetch(`https://api.gtwy.ai/collection/${caseId}/resources`, {
+    static async getResourcesByCase(collectionId: string) {
+        const response = await fetch(`https://api.gtwy.ai/collection/${collectionId}/resources`, {
             method: 'GET',
             headers: {
                 'pauthkey': config.GTWY_PAUTHKEY,
@@ -99,7 +99,7 @@ export class GtwyService {
     }
 
     static async getThreadHistory(agentId: string, threadId: string) {
-        const response = await fetch(`https://api.gtwy.ai/api/history/${agentId}/${threadId}/${threadId}`, {
+        const response = await fetch(`https://api.gtwy.ai/api/history/${agentId}/${threadId}`, {
             method: 'GET',
             headers: {
                 'pauthkey': config.GTWY_PAUTHKEY,

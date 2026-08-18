@@ -179,7 +179,7 @@ export class CaseRepository {
 
         const result = await pool.query<CaseUpdateResultRow>(
             `UPDATE cases SET ${fields.join(', ')} WHERE id = $${idx}
-             RETURNING id, title, status, case_number, court, instructions, next_hearing_date, updated_at`,
+             RETURNING id, title, description, status, case_number, court, instructions, next_hearing_date, updated_at`,
             values
         );
 
