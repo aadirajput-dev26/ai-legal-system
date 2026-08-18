@@ -1,4 +1,5 @@
-import pool from '../lib/db.js';
+import { OrgMemberRepository } from '../repositories/org-member.repository.js';
+import { CaseMemberRepository } from '../repositories/case-member.repository.js';
 import type { Role } from '../types/index.js';
 
 /**
@@ -14,20 +15,14 @@ export function requireOrgRole(allowedRoles: Role[]) {
         const { id: orgId } = req.params as { id: string };
         const userId = (req.user as { userId: string }).userId;
 
-        const result = await pool.query<{ role: Role }>(
-            `SELECT role FROM organisation_members
-             WHERE organisation_id = $1 AND user_id = $2`,
-            [orgId, userId]
-        );
+        const role = await OrgMemberRepository.getRole(orgId, userId);
 
-        const member = result.rows[0];
-
-        if (!member || !allowedRoles.includes(member.role)) {
+        if (!role || !allowedRoles.includes(role)) {
             reply.code(403).send({
                 success: false,
                 error: {
                     code   : 'INSUFFICIENT_PERMISSIONS',
-                    message: `Role '${member?.role ?? 'NONE'}' is not authorized to perform this action on the organisation.`,
+                    message: `Role '${role ?? 'NONE'}' is not authorized to perform this action on the organisation.`,
                 },
             });
         }
@@ -47,20 +42,14 @@ export function requireCaseRole(allowedRoles: Role[]) {
         const { id: caseId } = req.params as { id: string };
         const userId = (req.user as { userId: string }).userId;
 
-        const result = await pool.query<{ role: Role }>(
-            `SELECT role FROM case_members
-             WHERE case_id = $1 AND user_id = $2`,
-            [caseId, userId]
-        );
+        const role = await CaseMemberRepository.getRole(caseId, userId);
 
-        const member = result.rows[0];
-
-        if (!member || !allowedRoles.includes(member.role)) {
+        if (!role || !allowedRoles.includes(role)) {
             reply.code(403).send({
                 success: false,
                 error: {
                     code   : 'INSUFFICIENT_PERMISSIONS',
-                    message: `Role '${member?.role ?? 'NONE'}' is not authorized to perform this action on the case.`,
+                    message: `Role '${role ?? 'NONE'}' is not authorized to perform this action on the case.`,
                 },
             });
         }

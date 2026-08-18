@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import pool from '../lib/db.js';
+import { OrgMemberRepository } from '../repositories/org-member.repository.js';
+import { UserRepository } from '../repositories/user.repository.js';
 import type { Role } from '../types/index.js';
 
 // ─────────────────────────────────────────────
@@ -8,19 +9,9 @@ import type { Role } from '../types/index.js';
 export async function listOrgMembers(req: FastifyRequest, reply: FastifyReply) {
     const { id: orgId } = req.params as { id: string };
 
-    const result = await pool.query<{
-        user_id: string; name: string; email: string; avatar: string | null;
-        role: Role; joined_at: string;
-    }>(
-        `SELECT u.id AS user_id, u.name, u.email, u.avatar, om.role, om.joined_at
-         FROM organisation_members om
-         JOIN users u ON u.id = om.user_id
-         WHERE om.organisation_id = $1
-         ORDER BY om.joined_at ASC`,
-        [orgId]
-    );
+    const members = await OrgMemberRepository.listMembers(orgId);
 
-    return reply.code(200).send({ success: true, data: result.rows });
+    return reply.code(200).send({ success: true, data: members });
 }
 
 // ─────────────────────────────────────────────
@@ -34,12 +25,9 @@ export async function addOrgMember(req: FastifyRequest, reply: FastifyReply) {
     const { email, role } = req.body as AddMemberBody;
 
     // Strict check: user account must exist
-    const userResult = await pool.query<{ id: string }>(
-        'SELECT id FROM users WHERE email = $1',
-        [email.toLowerCase()]
-    );
+    const user = await UserRepository.findByEmail(email);
 
-    if (!userResult.rows[0]) {
+    if (!user) {
         return reply.code(404).send({
             success: false,
             error: {
@@ -49,15 +37,8 @@ export async function addOrgMember(req: FastifyRequest, reply: FastifyReply) {
         });
     }
 
-    const userId = userResult.rows[0].id;
-
     // Upsert: update role if already a member
-    await pool.query(
-        `INSERT INTO organisation_members (organisation_id, user_id, role)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (organisation_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
-        [orgId, userId, role]
-    );
+    await OrgMemberRepository.addMember(orgId, user.id, role);
 
     return reply.code(200).send({
         success: true,
@@ -75,13 +56,9 @@ export async function updateOrgMemberRole(req: FastifyRequest, reply: FastifyRep
     const { id: orgId, userId: targetUserId } = req.params as { id: string; userId: string };
     const { role } = req.body as UpdateMemberRoleBody;
 
-    const result = await pool.query(
-        `UPDATE organisation_members SET role = $1
-         WHERE organisation_id = $2 AND user_id = $3`,
-        [role, orgId, targetUserId]
-    );
+    const updated = await OrgMemberRepository.updateRole(orgId, targetUserId, role);
 
-    if (result.rowCount === 0) {
+    if (!updated) {
         return reply.code(404).send({
             success: false,
             error: { code: 'NOT_FOUND', message: 'Member not found in this organisation.' },
@@ -101,13 +78,9 @@ export async function updateOrgMemberRole(req: FastifyRequest, reply: FastifyRep
 export async function removeOrgMember(req: FastifyRequest, reply: FastifyReply) {
     const { id: orgId, userId: targetUserId } = req.params as { id: string; userId: string };
 
-    const result = await pool.query(
-        `DELETE FROM organisation_members
-         WHERE organisation_id = $1 AND user_id = $2`,
-        [orgId, targetUserId]
-    );
+    const removed = await OrgMemberRepository.removeMember(orgId, targetUserId);
 
-    if (result.rowCount === 0) {
+    if (!removed) {
         return reply.code(404).send({
             success: false,
             error: { code: 'NOT_FOUND', message: 'Member not found in this organisation.' },

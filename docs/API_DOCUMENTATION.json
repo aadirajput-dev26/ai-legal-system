@@ -259,6 +259,57 @@
           "required_case_role": ["ADMIN"],
           "response_200": { "success": true, "data": { "message": "Member removed from case." } },
           "errors": { "404": "NOT_FOUND" }
+        },
+        {
+          "method": "GET",
+          "path": "/cases/:id/documents",
+          "description": "List all documents and resources associated with a case",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR", "VIEWER"],
+          "response_200": { "success": true, "data": [] }
+        },
+        {
+          "method": "POST",
+          "path": "/cases/:id/documents",
+          "description": "Upload a new document (PDF multipart/form-data) or create a link/text resource",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR"],
+          "body": "multipart/form-data or json",
+          "response_201": { "success": true, "data": { "resource_id": "string" } }
+        },
+        {
+          "method": "GET",
+          "path": "/cases/:id/chats",
+          "description": "List all chat threads for a case",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR", "VIEWER"],
+          "response_200": { "success": true, "chats": [{ "id": "uuid", "case_id": "uuid", "title": "string", "created_at": "timestamp" }] }
+        },
+        {
+          "method": "POST",
+          "path": "/cases/:id/chats",
+          "description": "Create a new chat thread",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR"],
+          "body": { "title": "string (optional)" },
+          "response_201": { "success": true, "chat": { "id": "uuid", "case_id": "uuid", "title": "string", "created_at": "timestamp" } }
+        },
+        {
+          "method": "GET",
+          "path": "/cases/:id/chats/:chatId/history",
+          "description": "Fetch chat history directly from Gateway Universal Agent",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR", "VIEWER"],
+          "response_200": { "data": "array of message objects from gateway" }
+        },
+        {
+          "method": "POST",
+          "path": "/cases/:id/chats/:chatId/message",
+          "description": "Send a message to the Gateway Universal Agent",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR"],
+          "body": { "message": "string (required)" },
+          "response_200": { "success": true, "action": "Gateway Query", "response": "object from gateway" }
         }
       ]
     }

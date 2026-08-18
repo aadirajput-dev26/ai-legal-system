@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import pool from '../lib/db.js';
+import { OrganisationRepository } from '../repositories/organisation.repository.js';
 
 // ─────────────────────────────────────────────
 // GET /api/v1/organisations
@@ -8,19 +8,9 @@ import pool from '../lib/db.js';
 export async function listOrganisations(req: FastifyRequest, reply: FastifyReply) {
     const { userId } = req.user;
 
-    const result = await pool.query<{
-        id: string; name: string; description: string | null;
-        created_at: string; role: string;
-    }>(
-        `SELECT o.id, o.name, o.description, o.created_at, om.role
-         FROM organisations o
-         JOIN organisation_members om ON om.organisation_id = o.id
-         WHERE om.user_id = $1
-         ORDER BY o.created_at DESC`,
-        [userId]
-    );
+    const orgs = await OrganisationRepository.listByUser(userId);
 
-    return reply.code(200).send({ success: true, data: result.rows });
+    return reply.code(200).send({ success: true, data: orgs });
 }
 
 // ─────────────────────────────────────────────
@@ -33,32 +23,11 @@ export async function createOrganisation(req: FastifyRequest, reply: FastifyRepl
     const { name, description } = req.body as CreateOrgBody;
     const { userId } = req.user;
 
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN');
-
-        const orgResult = await client.query<{ id: string; name: string; description: string | null; created_at: string }>(
-            `INSERT INTO organisations (name, description)
-             VALUES ($1, $2)
-             RETURNING id, name, description, created_at`,
-            [name, description ?? null]
-        );
-        const org = orgResult.rows[0];
-
-        // Creator automatically becomes ADMIN
-        await client.query(
-            `INSERT INTO organisation_members (organisation_id, user_id, role)
-             VALUES ($1, $2, 'ADMIN')`,
-            [org.id, userId]
-        );
-
-        await client.query('COMMIT');
+        const org = await OrganisationRepository.create(name, description ?? null, userId);
         return reply.code(201).send({ success: true, data: org });
     } catch (err) {
-        await client.query('ROLLBACK');
         throw err;
-    } finally {
-        client.release();
     }
 }
 
@@ -68,22 +37,16 @@ export async function createOrganisation(req: FastifyRequest, reply: FastifyRepl
 export async function getOrganisation(req: FastifyRequest, reply: FastifyReply) {
     const { id } = req.params as { id: string };
 
-    const result = await pool.query<{
-        id: string; name: string; description: string | null;
-        created_at: string; updated_at: string;
-    }>(
-        'SELECT id, name, description, created_at, updated_at FROM organisations WHERE id = $1',
-        [id]
-    );
+    const org = await OrganisationRepository.findById(id);
 
-    if (!result.rows[0]) {
+    if (!org) {
         return reply.code(404).send({
             success: false,
             error: { code: 'NOT_FOUND', message: 'Organisation not found.' },
         });
     }
 
-    return reply.code(200).send({ success: true, data: result.rows[0] });
+    return reply.code(200).send({ success: true, data: org });
 }
 
 // ─────────────────────────────────────────────
@@ -96,29 +59,16 @@ export async function updateOrganisation(req: FastifyRequest, reply: FastifyRepl
     const { id } = req.params as { id: string };
     const body = req.body as UpdateOrgBody;
 
-    const fields: string[]  = [];
-    const values: unknown[] = [];
-    let idx = 1;
+    const org = await OrganisationRepository.update(id, { name: body.name, description: body.description });
 
-    if (body.name        != null) { fields.push(`name = $${idx++}`);        values.push(body.name); }
-    if (body.description != null) { fields.push(`description = $${idx++}`); values.push(body.description); }
-
-    if (fields.length === 0) {
+    if (!org) {
         return reply.code(400).send({
             success: false,
             error: { code: 'NO_FIELDS', message: 'No fields provided to update.' },
         });
     }
 
-    fields.push(`updated_at = NOW()`);
-    values.push(id);
-
-    const result = await pool.query(
-        `UPDATE organisations SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, description, updated_at`,
-        values
-    );
-
-    return reply.code(200).send({ success: true, data: result.rows[0] });
+    return reply.code(200).send({ success: true, data: org });
 }
 
 // ─────────────────────────────────────────────
@@ -127,9 +77,9 @@ export async function updateOrganisation(req: FastifyRequest, reply: FastifyRepl
 export async function deleteOrganisation(req: FastifyRequest, reply: FastifyReply) {
     const { id } = req.params as { id: string };
 
-    const result = await pool.query('DELETE FROM organisations WHERE id = $1', [id]);
+    const deleted = await OrganisationRepository.delete(id);
 
-    if (result.rowCount === 0) {
+    if (!deleted) {
         return reply.code(404).send({
             success: false,
             error: { code: 'NOT_FOUND', message: 'Organisation not found.' },
