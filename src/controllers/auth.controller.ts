@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcryptjs';
-import pool from '../lib/db.js';
+import { UserRepository } from '../repositories/user.repository.js';
 import { config } from '../lib/config.js';
 import type { JwtPayload } from '../types/index.js';
 
@@ -21,11 +21,8 @@ export async function signup(req: FastifyRequest, reply: FastifyReply) {
     const { name, email, password } = req.body as SignupBody;
 
     // Check for existing account
-    const existing = await pool.query(
-        'SELECT id FROM users WHERE email = $1',
-        [email.toLowerCase()]
-    );
-    if (existing.rows.length > 0) {
+    const exists = await UserRepository.existsByEmail(email);
+    if (exists) {
         return reply.code(409).send({
             success: false,
             error: {
@@ -37,14 +34,8 @@ export async function signup(req: FastifyRequest, reply: FastifyReply) {
 
     const password_hash = await bcrypt.hash(password, 12);
 
-    const result = await pool.query<{ id: string; name: string; email: string }>(
-        `INSERT INTO users (name, email, password_hash)
-         VALUES ($1, $2, $3)
-         RETURNING id, name, email`,
-        [name, email.toLowerCase(), password_hash]
-    );
+    const user = await UserRepository.create(name, email, password_hash);
 
-    const user = result.rows[0];
     return reply.code(201).send({
         success: true,
         data   : { id: user.id, name: user.name, email: user.email },
@@ -62,14 +53,7 @@ interface LoginBody {
 export async function login(req: FastifyRequest, reply: FastifyReply) {
     const { email, password } = req.body as LoginBody;
 
-    const result = await pool.query<{
-        id: string; name: string; email: string; password_hash: string;
-    }>(
-        'SELECT id, name, email, password_hash FROM users WHERE email = $1',
-        [email.toLowerCase()]
-    );
-
-    const user = result.rows[0];
+    const user = await UserRepository.findByEmail(email);
 
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
         return reply.code(401).send({

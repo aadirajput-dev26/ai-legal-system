@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS cases (
     case_number     TEXT,
     court           TEXT,
     case_type       TEXT,
+    instructions    TEXT,
     status          case_status NOT NULL DEFAULT 'OPEN',
     filing_date     DATE,
     next_hearing_date TIMESTAMPTZ,

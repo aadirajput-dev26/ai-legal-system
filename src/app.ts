@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import postgres from '@fastify/postgres';
+import multipart from '@fastify/multipart';
 import { config } from './lib/config.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { organisationRoutes } from './routes/organisation.routes.js';
@@ -19,6 +20,7 @@ export const App = () => {
     app.register(cors, { origin: '*' });
 
     app.register(cookie);
+    app.register(multipart);
 
     app.register(jwt, {
         secret: config.JWT_ACCESS_SECRET,

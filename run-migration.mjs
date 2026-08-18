@@ -7,7 +7,7 @@
  * Run with:  node run-migration.mjs
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
@@ -18,15 +18,24 @@ dotenv();
 
 const { Client } = pg;
 
-const sql = readFileSync(resolve(__dirname, 'db/migrations/001_auth_rbac.sql'), 'utf-8');
-
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 
 async function main() {
     await client.connect();
     console.log('✅ Connected to database');
-    await client.query(sql);
-    console.log('✅ Migration 001_auth_rbac applied successfully');
+
+    const migrationsDir = resolve(__dirname, 'db/migrations');
+    const files = readdirSync(migrationsDir)
+        .filter(f => f.endsWith('.sql'))
+        .sort();
+
+    for (const file of files) {
+        console.log(`Running migration: ${file}...`);
+        const sql = readFileSync(resolve(migrationsDir, file), 'utf-8');
+        await client.query(sql);
+        console.log(`✅ Applied ${file} successfully`);
+    }
+
     await client.end();
 }
 
