@@ -1,7 +1,6 @@
-import { App } from "./app";
-import { config } from "./lib/config";
+import { App } from "./app.js";
+import { config } from "./lib/config.js";
 
-const fastify = App();
 async function main(): Promise<void>{
     const app = App();
     await app.listen({
