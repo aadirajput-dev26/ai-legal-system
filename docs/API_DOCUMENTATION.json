@@ -1,0 +1,279 @@
+{
+  "info": {
+    "title": "AI Legal Case Management System API",
+    "version": "1.0.0",
+    "baseUrl": "/api/v1",
+    "auth": {
+      "type": "Bearer JWT",
+      "header": "Authorization: Bearer <access_token>",
+      "refreshCookie": "refreshToken (httpOnly, secure)"
+    }
+  },
+  "modules": {
+    "auth": {
+      "prefix": "/api/v1/auth",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/signup",
+          "description": "Register a new user account",
+          "auth": false,
+          "body": { "name": "string", "email": "string", "password": "string" },
+          "response_201": { "success": true, "data": { "id": "uuid", "name": "string", "email": "string" } },
+          "errors": { "409": "EMAIL_ALREADY_EXISTS" }
+        },
+        {
+          "method": "POST",
+          "path": "/login",
+          "description": "Authenticate user. Returns access token + sets refresh cookie",
+          "auth": false,
+          "body": { "email": "string", "password": "string" },
+          "response_200": {
+            "success": true,
+            "data": {
+              "accessToken": "string (15m expiry)",
+              "user": { "id": "uuid", "name": "string", "email": "string" }
+            }
+          },
+          "cookies": { "refreshToken": "httpOnly, secure, sameSite=strict, 7d" },
+          "errors": { "401": "INVALID_CREDENTIALS" }
+        },
+        {
+          "method": "POST",
+          "path": "/refresh",
+          "description": "Issue a new access token using the refresh cookie",
+          "auth": false,
+          "cookie_required": "refreshToken",
+          "response_200": { "success": true, "data": { "accessToken": "string" } },
+          "errors": { "401": ["MISSING_REFRESH_TOKEN", "TOKEN_REVOKED", "INVALID_REFRESH_TOKEN"] }
+        },
+        {
+          "method": "POST",
+          "path": "/logout",
+          "description": "Revoke session and clear refresh cookie",
+          "auth": true,
+          "response_200": { "success": true, "data": { "message": "Logged out successfully." } }
+        },
+        {
+          "method": "GET",
+          "path": "/me",
+          "description": "Returns authenticated user profile from JWT",
+          "auth": true,
+          "response_200": { "success": true, "data": { "userId": "uuid", "email": "string", "name": "string" } }
+        }
+      ]
+    },
+    "organisations": {
+      "prefix": "/api/v1/organisations",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/",
+          "description": "List all organisations the current user belongs to",
+          "auth": true,
+          "response_200": {
+            "success": true,
+            "data": [{ "id": "uuid", "name": "string", "description": "string|null", "created_at": "timestamp", "role": "ADMIN|EDITOR|VIEWER" }]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/",
+          "description": "Create a new organisation. Creator becomes ADMIN.",
+          "auth": true,
+          "body": { "name": "string (required)", "description": "string (optional)" },
+          "response_201": { "success": true, "data": { "id": "uuid", "name": "string", "description": "string|null", "created_at": "timestamp" } }
+        },
+        {
+          "method": "GET",
+          "path": "/:id",
+          "description": "Get organisation details",
+          "auth": true,
+          "required_org_role": ["ADMIN", "EDITOR", "VIEWER"],
+          "response_200": { "success": true, "data": { "id": "uuid", "name": "string", "description": "string|null", "created_at": "timestamp", "updated_at": "timestamp" } },
+          "errors": { "404": "NOT_FOUND" }
+        },
+        {
+          "method": "PATCH",
+          "path": "/:id",
+          "description": "Update organisation name or description",
+          "auth": true,
+          "required_org_role": ["ADMIN"],
+          "body": { "name": "string (optional)", "description": "string (optional)" },
+          "response_200": { "success": true, "data": { "id": "uuid", "name": "string", "updated_at": "timestamp" } }
+        },
+        {
+          "method": "DELETE",
+          "path": "/:id",
+          "description": "Delete an organisation (cascades to cases and members)",
+          "auth": true,
+          "required_org_role": ["ADMIN"],
+          "response_200": { "success": true, "data": { "message": "Organisation deleted." } },
+          "errors": { "404": "NOT_FOUND" }
+        },
+        {
+          "method": "GET",
+          "path": "/:id/members",
+          "description": "List all members of an organisation",
+          "auth": true,
+          "required_org_role": ["ADMIN", "EDITOR", "VIEWER"],
+          "response_200": {
+            "success": true,
+            "data": [{ "user_id": "uuid", "name": "string", "email": "string", "avatar": "string|null", "role": "ADMIN|EDITOR|VIEWER", "joined_at": "timestamp" }]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/:id/members",
+          "description": "Invite an existing user to the organisation by email. User must have signed up first.",
+          "auth": true,
+          "required_org_role": ["ADMIN"],
+          "body": { "email": "string (required)", "role": "ADMIN|EDITOR|VIEWER (required)" },
+          "response_200": { "success": true, "data": { "message": "string" } },
+          "errors": { "404": "USER_NOT_FOUND - User with this email has not signed up yet" }
+        },
+        {
+          "method": "PATCH",
+          "path": "/:id/members/:userId",
+          "description": "Update a member's role in the organisation",
+          "auth": true,
+          "required_org_role": ["ADMIN"],
+          "body": { "role": "ADMIN|EDITOR|VIEWER (required)" },
+          "response_200": { "success": true, "data": { "message": "string" } },
+          "errors": { "404": "NOT_FOUND" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/:id/members/:userId",
+          "description": "Remove a member from the organisation",
+          "auth": true,
+          "required_org_role": ["ADMIN"],
+          "response_200": { "success": true, "data": { "message": "Member removed from organisation." } },
+          "errors": { "404": "NOT_FOUND" }
+        }
+      ]
+    },
+    "cases": {
+      "prefix": "/api/v1",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/organisations/:id/cases",
+          "description": "List all cases in an organisation the current user has access to",
+          "auth": true,
+          "required_org_role": ["ADMIN", "EDITOR", "VIEWER"],
+          "response_200": {
+            "success": true,
+            "data": [{ "id": "uuid", "title": "string", "status": "OPEN|CLOSED|ARCHIVED", "case_number": "string|null", "court": "string|null", "next_hearing_date": "timestamp|null", "created_at": "timestamp", "role": "ADMIN|EDITOR|VIEWER" }]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/organisations/:id/cases",
+          "description": "Create a new case. Automatically provisions a Hippocampus collection and assigns creator as Case ADMIN.",
+          "auth": true,
+          "required_org_role": ["ADMIN", "EDITOR"],
+          "body": {
+            "title": "string (required)",
+            "description": "string (optional)",
+            "case_number": "string (optional)",
+            "court": "string (optional)",
+            "case_type": "string (optional)",
+            "filing_date": "date string (optional)"
+          },
+          "response_201": { "success": true, "data": { "id": "uuid", "title": "string", "status": "OPEN", "collection_id": "string (Hippocampus _id)" } }
+        },
+        {
+          "method": "GET",
+          "path": "/cases/:id",
+          "description": "Get full case details",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR", "VIEWER"],
+          "response_200": {
+            "success": true,
+            "data": { "id": "uuid", "title": "string", "description": "string|null", "status": "string", "case_number": "string|null", "court": "string|null", "case_type": "string|null", "collection_id": "string|null", "filing_date": "string|null", "next_hearing_date": "string|null", "created_at": "timestamp", "updated_at": "timestamp" }
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/cases/:id",
+          "description": "Update case fields (partial update supported)",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR"],
+          "body": {
+            "title": "string (optional)",
+            "description": "string (optional)",
+            "status": "OPEN|CLOSED|ARCHIVED (optional)",
+            "court": "string (optional)",
+            "case_number": "string (optional)",
+            "case_type": "string (optional)",
+            "next_hearing_date": "timestamp string (optional)"
+          },
+          "response_200": { "success": true, "data": { "id": "uuid", "title": "string", "status": "string", "updated_at": "timestamp" } }
+        },
+        {
+          "method": "DELETE",
+          "path": "/cases/:id",
+          "description": "Delete case and clean up Hippocampus collection (best-effort)",
+          "auth": true,
+          "required_case_role": ["ADMIN"],
+          "response_200": { "success": true, "data": { "message": "Case deleted." } },
+          "errors": { "404": "NOT_FOUND" }
+        },
+        {
+          "method": "GET",
+          "path": "/cases/:id/members",
+          "description": "List all members assigned to a case",
+          "auth": true,
+          "required_case_role": ["ADMIN", "EDITOR", "VIEWER"],
+          "response_200": {
+            "success": true,
+            "data": [{ "user_id": "uuid", "name": "string", "email": "string", "avatar": "string|null", "role": "ADMIN|EDITOR|VIEWER", "joined_at": "timestamp" }]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/cases/:id/members",
+          "description": "Add an org member to a case. User must already be a member of the parent organisation.",
+          "auth": true,
+          "required_case_role": ["ADMIN"],
+          "body": { "userId": "uuid (required)", "role": "ADMIN|EDITOR|VIEWER (required)" },
+          "response_200": { "success": true, "data": { "message": "string" } },
+          "errors": { "400": "NOT_ORG_MEMBER", "404": "NOT_FOUND" }
+        },
+        {
+          "method": "PATCH",
+          "path": "/cases/:id/members/:userId",
+          "description": "Update a case member's role",
+          "auth": true,
+          "required_case_role": ["ADMIN"],
+          "body": { "role": "ADMIN|EDITOR|VIEWER (required)" },
+          "response_200": { "success": true, "data": { "message": "string" } },
+          "errors": { "404": "NOT_FOUND" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/cases/:id/members/:userId",
+          "description": "Remove a member from a case",
+          "auth": true,
+          "required_case_role": ["ADMIN"],
+          "response_200": { "success": true, "data": { "message": "Member removed from case." } },
+          "errors": { "404": "NOT_FOUND" }
+        }
+      ]
+    }
+  },
+  "error_codes": {
+    "UNAUTHORIZED": "Missing or invalid access token (401)",
+    "INSUFFICIENT_PERMISSIONS": "Role does not have permission for this action (403)",
+    "NOT_FOUND": "Resource not found (404)",
+    "USER_NOT_FOUND": "User with given email has not signed up yet (404)",
+    "NOT_ORG_MEMBER": "Target user is not a member of the parent organisation (400)",
+    "EMAIL_ALREADY_EXISTS": "Account already exists with this email (409)",
+    "INVALID_CREDENTIALS": "Email or password is incorrect (401)",
+    "MISSING_REFRESH_TOKEN": "Refresh token cookie not present (401)",
+    "TOKEN_REVOKED": "Refresh token has been revoked (401)",
+    "INVALID_REFRESH_TOKEN": "Refresh token is invalid or expired (401)",
+    "NO_FIELDS": "No update fields provided in request body (400)"
+  }
+}
