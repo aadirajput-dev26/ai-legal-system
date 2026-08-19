@@ -9,6 +9,7 @@ const env = z.object({
     JWT_REFRESH_SECRET : z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
     HIPPOCAMPUS_HOST_URL : z.string().url(),
     GTWY_PAUTHKEY        : z.string().min(1),
+    NOTIFICATION_WEBHOOK_URL : z.string().url().optional(),
 });
 
 export const config = env.parse(process.env);

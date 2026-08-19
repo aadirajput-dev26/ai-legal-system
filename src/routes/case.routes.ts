@@ -5,6 +5,7 @@ import * as caseController from '../controllers/case.controller.js';
 import * as caseMemberController from '../controllers/case-member.controller.js';
 import * as documentController from '../controllers/document.controller.js';
 import * as chatController from '../controllers/chat.controller.js';
+import * as hearingController from '../controllers/hearing.controller.js';
 
 export async function caseRoutes(app: FastifyInstance) {
     // ── Cases within an Org ────────────────────────────────────────
@@ -36,4 +37,8 @@ export async function caseRoutes(app: FastifyInstance) {
     app.post<{ Params: { id: string } }>('/cases/:id/chats', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, chatController.createChat);
     app.get<{ Params: { id: string, chatId: string } }>('/cases/:id/chats/:chatId/history', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, chatController.getChatHistory);
     app.post<{ Params: { id: string, chatId: string } }>('/cases/:id/chats/:chatId/message', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, chatController.sendMessage);
+
+    // ── Hearings ───────────────────────────────────────────────────
+    app.get<{ Params: { id: string } }>('/cases/:id/hearings',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, hearingController.listHearings);
+    app.post<{ Params: { id: string } }>('/cases/:id/hearings', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, hearingController.createHearing);
 }

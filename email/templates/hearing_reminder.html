@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hearing Reminder – {{CASE_TITLE}}</title>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+    }
+    .wrapper {
+      max-width: 620px;
+      margin: 32px auto;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 32px 40px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .badge-immediate { background: #3b82f6; color: #fff; }
+    .badge-24h       { background: #f59e0b; color: #fff; }
+    .badge-1h        { background: #ef4444; color: #fff; }
+    .body {
+      padding: 36px 40px;
+    }
+    .greeting {
+      font-size: 16px;
+      margin-bottom: 24px;
+    }
+    .info-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .info-card h2 {
+      margin: 0 0 16px;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    .info-row .label { color: #64748b; font-weight: 600; }
+    .info-row .value { color: #1a1a2e; font-weight: 500; }
+    .notes-card {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .notes-card h2 {
+      margin: 0 0 12px;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #92400e;
+    }
+    .notes-card p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #78350f;
+      white-space: pre-line;
+    }
+    .footer {
+      padding: 20px 40px;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>⚖️ Hearing Reminder</h1>
+      <span class="badge badge-{{STAGE_CLASS}}">{{STAGE_LABEL}}</span>
+    </div>
+    <div class="body">
+      <p class="greeting">Hello <strong>{{RECIPIENT_NAME}}</strong>,</p>
+      <p>This is a reminder for an upcoming hearing in the case <strong>{{CASE_TITLE}}</strong>.</p>
+
+      <div class="info-card">
+        <h2>📋 Hearing Details</h2>
+        <div class="info-row">
+          <span class="label">Case</span>
+          <span class="value">{{CASE_TITLE}}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Case Number</span>
+          <span class="value">{{CASE_NUMBER}}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Court</span>
+          <span class="value">{{COURT}}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Date &amp; Time</span>
+          <span class="value">{{HEARING_DATE}}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Your Role</span>
+          <span class="value">{{RECIPIENT_ROLE}}</span>
+        </div>
+      </div>
+
+      <div class="notes-card">
+        <h2>📝 AI-Generated Briefing Notes</h2>
+        <p>{{HEARING_NOTES}}</p>
+      </div>
+
+      <p style="font-size:13px; color:#64748b;">
+        Please ensure all required documents are prepared ahead of the hearing.
+        This notification was sent automatically by your AI Legal System.
+      </p>
+    </div>
+    <div class="footer">
+      AI Legal System &nbsp;·&nbsp; Automated Notification &nbsp;·&nbsp; Do not reply to this email
+    </div>
+  </div>
+</body>
+</html>
