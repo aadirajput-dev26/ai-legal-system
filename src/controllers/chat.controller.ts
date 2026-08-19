@@ -66,11 +66,14 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         const authHeader = req.headers.authorization || '';
         const accessToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
 
-        // Variables required by GTWY agent tools
+        // Variables required by GTWY agent tools and personalized context
         const variables = {
             caseId: caseId,
             collectionId: caseRecord.collection_id || '',
-            accessToken: accessToken
+            accessToken: accessToken,
+            caseName: caseRecord.title || '',
+            caseDescription: caseRecord.description || '',
+            caseInstructions: caseRecord.instructions || ''
         };
 
         // Delegate to Orchestrator Agent
