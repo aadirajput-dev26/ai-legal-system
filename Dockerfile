@@ -32,6 +32,8 @@ WORKDIR /app
 # Copy only the compiled output and runtime dependencies
 COPY --from=builder /app/dist ./dist
 COPY package*.json ./
+COPY run-migration.mjs ./
+COPY db ./db
 
 # Install only production dependencies (skip dev)
 RUN npm ci --omit=dev
