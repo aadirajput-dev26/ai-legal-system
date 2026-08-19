@@ -7,7 +7,9 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "migrate": "node run-migration.mjs"
+    "migrate": "node run-migration.mjs",
+    "docker:build": "docker build -t ai-legal-backend .",
+    "docker:up": "docker compose up -d"
   },
   "keywords": [],
   "author": "",
