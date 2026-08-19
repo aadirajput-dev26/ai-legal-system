@@ -1,0 +1,79 @@
+import { config } from './config.js';
+
+/**
+ * hippocampus.ts — HTTP client for the Hippocampus RAG service.
+ *
+ * All Hippocampus API calls are centralised here so that:
+ * - Auth headers are injected in one place.
+ * - The base URL is configurable via environment variable.
+ * - Other services can import clean, typed functions without
+ *   knowing about raw fetch() details.
+ */
+
+const BASE_URL = config.HIPPOCAMPUS_HOST_URL;
+const HEADERS  = {
+    'Content-Type': 'application/json',
+    'pauthkey'    : config.GTWY_PAUTHKEY,
+};
+
+export interface HippocampusCollection {
+    collection_id: string;   // This is data._id from Hippocampus response
+    name         : string;
+    created_at   : string;
+}
+
+// ─────────────────────────────────────────────
+// Create a new collection in Hippocampus for a case
+// ─────────────────────────────────────────────
+export async function createCollection(caseName: string): Promise<HippocampusCollection> {
+    const response = await fetch(`${BASE_URL}/collection`, {
+        method : 'POST',
+        headers: HEADERS,
+        body   : JSON.stringify({
+            name    : caseName,
+            settings: {
+                denseModel   : 'BAAI/bge-large-en-v1.5',
+                sparseModel  : 'Qdrant/bm25',
+                rerankerModel: 'colbert-ir/colbertv2.0',
+                chunkSize    : 1000,
+                chunkOverlap : 100,
+            },
+        }),
+    });
+
+    if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Hippocampus createCollection failed [${response.status}]: ${body}`);
+    }
+
+    const json = await response.json() as {
+        success: boolean;
+        data   : { _id: string; name: string; created_at: string; };
+    };
+
+    if (!json.success) {
+        throw new Error('Hippocampus returned success=false on createCollection');
+    }
+
+    return {
+        // NOTE: collection_id for us is data._id (NOT data.collection_id)
+        collection_id: json.data._id,
+        name         : json.data.name,
+        created_at   : json.data.created_at,
+    };
+}
+
+// ─────────────────────────────────────────────
+// Delete a collection from Hippocampus (called on case deletion)
+// ─────────────────────────────────────────────
+export async function deleteCollection(collectionId: string): Promise<void> {
+    const response = await fetch(`${BASE_URL}/collection/${collectionId}`, {
+        method : 'DELETE',
+        headers: HEADERS,
+    });
+
+    if (!response.ok) {
+        // Log but don't throw — case deletion should not be blocked by Hippocampus errors
+        console.error(`Hippocampus deleteCollection failed [${response.status}] for id=${collectionId}`);
+    }
+}
