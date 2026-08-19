@@ -57,7 +57,7 @@ export class GtwyService {
     }
 
     static async getResourcesByCase(collectionId: string) {
-        const response = await fetch(`https://api.gtwy.ai/collection/${collectionId}/resources`, {
+        const response = await fetch(`${config.HIPPOCAMPUS_HOST_URL}/collection/${collectionId}/resources`, {
             method: 'GET',
             headers: {
                 'pauthkey': config.GTWY_PAUTHKEY,
@@ -96,7 +96,7 @@ export class GtwyService {
     }
 
     static async getThreadHistory(agentId: string, threadId: string) {
-        const response = await fetch(`https://api.gtwy.ai/api/history/${agentId}/${threadId}`, {
+        const response = await fetch(`https://db.gtwy.ai/api/history/${agentId}/${threadId}/${threadId}?page=1&limit=40&user_feedback=all&error=false`, {
             method: 'GET',
             headers: {
                 'pauthkey': config.GTWY_PAUTHKEY,
