@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
     "build": "tsc",
     "start": "npm run migrate && node dist/server.js",
+    "start:worker": "node dist/worker.js",
     "migrate": "node run-migration.mjs",
     "docker:build": "docker build -t ai-legal-backend .",
     "docker:up": "docker compose up -d"

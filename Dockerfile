@@ -34,6 +34,7 @@ COPY --from=builder /app/dist ./dist
 COPY package*.json ./
 COPY run-migration.mjs ./
 COPY db ./db
+COPY email ./email
 
 # Install only production dependencies (skip dev)
 RUN npm ci --omit=dev
