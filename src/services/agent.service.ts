@@ -19,4 +19,18 @@ export class AgentService {
         // We will process the response format later based on Gateway's tool calling output
         return { success: true, action: 'Gateway Query', response: gtwyResponse };
     }
+
+    static async handleUserMessageStream(
+        caseId: string,
+        threadId: string,
+        userMessage: string,
+        variables?: Record<string, string>
+    ): Promise<Response> {
+        return GtwyService.sendMessageStream(
+            config.GTWY_UNIVERSAL_AGENT_ID,
+            threadId,
+            userMessage,
+            variables
+        );
+    }
 }

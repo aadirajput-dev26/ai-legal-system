@@ -95,6 +95,30 @@ export class GtwyService {
         return response.json();
     }
 
+    static async sendMessageStream(agentId: string, threadId: string, message: string, variables?: Record<string, string>): Promise<Response> {
+        const response = await fetch('https://api.gtwy.ai/api/v2/model/chat/completion', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'pauthkey': config.GTWY_PAUTHKEY,
+            },
+            body: JSON.stringify({
+                agent_id: agentId,
+                user: message,
+                thread_id: threadId,
+                variables,
+                stream: true
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to send message: ${response.status} ${errorText}`);
+        }
+
+        return response;
+    }
+
     static async getThreadHistory(agentId: string, threadId: string) {
         const response = await fetch(`https://db.gtwy.ai/api/history/${agentId}/${threadId}/${threadId}?page=1&limit=40&user_feedback=all&error=false`, {
             method: 'GET',

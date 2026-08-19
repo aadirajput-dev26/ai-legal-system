@@ -58,7 +58,7 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         const chat = await ChatThreadRepository.getById(chatId);
         if (!chat) return reply.status(404).send({ error: 'Chat not found' });
 
-        // Fetch the case to get the collection_id
+        // Fetch the case to get context
         const caseRecord = await CaseRepository.findById(caseId);
         if (!caseRecord) return reply.status(404).send({ error: 'Case not found' });
 
@@ -76,11 +76,37 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
             caseInstructions: caseRecord.instructions || ''
         };
 
-        // Delegate to Orchestrator Agent
-        const result = await AgentService.handleUserMessage(caseId, chatId, body.message, variables);
+        // Get the raw SSE stream from GTWY
+        const gtwyStream = await AgentService.handleUserMessageStream(caseId, chatId, body.message, variables);
 
-        return reply.send(result);
+        // Set SSE headers and pipe the stream directly to the client
+        reply.raw.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+        });
+
+        const reader = gtwyStream.body!.getReader();
+        const decoder = new TextDecoder();
+
+        const pump = async () => {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    reply.raw.end();
+                    break;
+                }
+                reply.raw.write(decoder.decode(value, { stream: true }));
+            }
+        };
+
+        await pump();
     } catch (error: any) {
-        return reply.status(500).send({ error: error.message });
+        // If headers already sent, can't reply normally
+        if (!reply.raw.headersSent) {
+            return reply.status(500).send({ error: error.message });
+        }
+        reply.raw.end();
     }
 };
