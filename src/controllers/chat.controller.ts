@@ -1,10 +1,9 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { ChatThreadRepository } from '../repositories/chat-thread.repository.js';
+import { CaseRepository } from '../repositories/case.repository.js';
 import { GtwyService } from '../services/gtwy.service.js';
 import { AgentService } from '../services/agent.service.js';
-
-// Reusing the Universal Agent ID
-const UNIVERSAL_AGENT_ID = '6a84a7b06245b84a954204c4';
+import { config } from '../lib/config.js';
 
 export const createChat = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
@@ -36,7 +35,7 @@ export const getChatHistory = async (req: FastifyRequest<{ Params: { id: string,
         const chat = await ChatThreadRepository.getById(chatId);
         if (!chat) return reply.status(404).send({ error: 'Chat not found' });
 
-        const history = await GtwyService.getThreadHistory(UNIVERSAL_AGENT_ID, chatId);
+        const history = await GtwyService.getThreadHistory(config.GTWY_UNIVERSAL_AGENT_ID, chatId);
         // Format history for the client. The frontend expects res.data to be an array of { role, content }
         const messages = Array.isArray(history) ? history : (history.data || history.messages || []);
         const formattedMessages = messages.map((m: any) => ({
@@ -59,8 +58,23 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         const chat = await ChatThreadRepository.getById(chatId);
         if (!chat) return reply.status(404).send({ error: 'Chat not found' });
 
+        // Fetch the case to get the collection_id
+        const caseRecord = await CaseRepository.findById(caseId);
+        if (!caseRecord) return reply.status(404).send({ error: 'Case not found' });
+
+        // Extract token
+        const authHeader = req.headers.authorization || '';
+        const accessToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
+
+        // Variables required by GTWY agent tools
+        const variables = {
+            caseId: caseId,
+            collectionId: caseRecord.collection_id || '',
+            accessToken: accessToken
+        };
+
         // Delegate to Orchestrator Agent
-        const result = await AgentService.handleUserMessage(caseId, chatId, body.message);
+        const result = await AgentService.handleUserMessage(caseId, chatId, body.message, variables);
 
         return reply.send(result);
     } catch (error: any) {

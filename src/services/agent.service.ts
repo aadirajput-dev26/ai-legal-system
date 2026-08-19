@@ -1,12 +1,20 @@
 import { GtwyService } from './gtwy.service.js';
-
-// Gateway universal agent provided by the user
-const UNIVERSAL_AGENT_ID = '6a84a7b06245b84a954204c4';
+import { config } from '../lib/config.js';
 
 export class AgentService {
-    static async handleUserMessage(caseId: string, threadId: string, userMessage: string) {
+    static async handleUserMessage(
+        caseId: string, 
+        threadId: string, 
+        userMessage: string,
+        variables?: Record<string, string>
+    ) {
         // Forward to Gateway API directly, as it acts as the orchestrator itself
-        const gtwyResponse = await GtwyService.sendMessage(UNIVERSAL_AGENT_ID, threadId, userMessage);
+        const gtwyResponse = await GtwyService.sendMessage(
+            config.GTWY_UNIVERSAL_AGENT_ID, 
+            threadId, 
+            userMessage,
+            variables
+        );
         
         // We will process the response format later based on Gateway's tool calling output
         return { success: true, action: 'Gateway Query', response: gtwyResponse };

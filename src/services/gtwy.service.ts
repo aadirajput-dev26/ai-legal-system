@@ -30,11 +30,7 @@ export class GtwyService {
         const payload: any = {
             collectionId: caseId,
             title: title,
-            ownerId: 'public',
-            settings: {
-                strategy: 'custom',
-                chunkingUrl: 'https://your-chunking-url/'
-            }
+            ownerId: 'public'
         };
 
         if (isUrl) {
@@ -76,7 +72,7 @@ export class GtwyService {
         return response.json();
     }
 
-    static async sendMessage(agentId: string, threadId: string, message: string) {
+    static async sendMessage(agentId: string, threadId: string, message: string, variables?: Record<string, string>) {
         const response = await fetch('https://api.gtwy.ai/api/v2/model/chat/completion', {
             method: 'POST',
             headers: {
@@ -86,7 +82,8 @@ export class GtwyService {
             body: JSON.stringify({
                 agent_id: agentId,
                 user: message,
-                thread_id: threadId
+                thread_id: threadId,
+                variables
             })
         });
 
