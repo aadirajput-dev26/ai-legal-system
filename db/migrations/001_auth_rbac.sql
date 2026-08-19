@@ -30,7 +30,11 @@ CREATE TABLE IF NOT EXISTS organisations (
 -- ─────────────────────────────────────────────
 -- 3. organisation_members
 -- ─────────────────────────────────────────────
-CREATE TYPE org_role AS ENUM ('ADMIN', 'EDITOR', 'VIEWER');
+DO $$ BEGIN
+    CREATE TYPE org_role AS ENUM ('ADMIN', 'EDITOR', 'VIEWER');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 CREATE TABLE IF NOT EXISTS organisation_members (
     organisation_id UUID NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
@@ -43,7 +47,11 @@ CREATE TABLE IF NOT EXISTS organisation_members (
 -- ─────────────────────────────────────────────
 -- 4. cases (stub — just the RBAC-essential columns)
 -- ─────────────────────────────────────────────
-CREATE TYPE case_status AS ENUM ('OPEN', 'CLOSED', 'ARCHIVED');
+DO $$ BEGIN
+    CREATE TYPE case_status AS ENUM ('OPEN', 'CLOSED', 'ARCHIVED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 CREATE TABLE IF NOT EXISTS cases (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,7 +73,11 @@ CREATE TABLE IF NOT EXISTS cases (
 -- ─────────────────────────────────────────────
 -- 5. case_members
 -- ─────────────────────────────────────────────
-CREATE TYPE case_role AS ENUM ('ADMIN', 'EDITOR', 'VIEWER');
+DO $$ BEGIN
+    CREATE TYPE case_role AS ENUM ('ADMIN', 'EDITOR', 'VIEWER');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 CREATE TABLE IF NOT EXISTS case_members (
     case_id   UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
