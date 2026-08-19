@@ -41,5 +41,5 @@ RUN npm ci --omit=dev
 # Expose the API port (adjust if your server uses a different port)
 EXPOSE 3000
 
-# Use the proper entry point – the compiled server
-CMD ["node", "dist/server.js"]
+# Use the proper entry point – npm start (which runs migrations then the server)
+CMD ["npm", "start"]
