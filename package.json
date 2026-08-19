@@ -1,11 +1,15 @@
 {
   "name": "ai-legal-system",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/server.js",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "migrate": "node run-migration.mjs"
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "migrate": "node run-migration.mjs",
+    "docker:build": "docker build -t ai-legal-backend .",
+    "docker:up": "docker compose up -d"
   },
   "keywords": [],
   "author": "",
