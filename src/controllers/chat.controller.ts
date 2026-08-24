@@ -79,34 +79,29 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         // Get the raw SSE stream from GTWY
         const gtwyStream = await AgentService.handleUserMessageStream(caseId, chatId, body.message, variables);
 
-        // Set SSE headers and pipe the stream directly to the client
-        reply.raw.writeHead(200, {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'X-Accel-Buffering': 'no',
-        });
+        // Set SSE headers using Fastify (this preserves CORS)
+        reply.header('Content-Type', 'text/event-stream');
+        reply.header('Cache-Control', 'no-cache');
+        reply.header('Connection', 'keep-alive');
+        reply.header('X-Accel-Buffering', 'no');
 
-        const reader = gtwyStream.body!.getReader();
-        const decoder = new TextDecoder();
-
-        const pump = async () => {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    reply.raw.end();
-                    break;
+        // Fastify natively supports AsyncIterables. 
+        // This pumps the chunks while allowing Fastify to manage the response lifecycle properly.
+        async function* streamGenerator() {
+            const reader = gtwyStream.body!.getReader();
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    yield value;
                 }
-                reply.raw.write(decoder.decode(value, { stream: true }));
+            } finally {
+                reader.releaseLock();
             }
-        };
-
-        await pump();
-    } catch (error: any) {
-        // If headers already sent, can't reply normally
-        if (!reply.raw.headersSent) {
-            return reply.status(500).send({ error: error.message });
         }
-        reply.raw.end();
+
+        return reply.send(streamGenerator());
+    } catch (error: any) {
+        return reply.status(500).send({ error: error.message });
     }
 };
