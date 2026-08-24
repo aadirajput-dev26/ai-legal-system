@@ -85,22 +85,24 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         reply.header('Connection', 'keep-alive');
         reply.header('X-Accel-Buffering', 'no');
 
-        // Fastify natively supports AsyncIterables. 
-        // This pumps the chunks while allowing Fastify to manage the response lifecycle properly.
+        // Fastify natively supports Node streams. We convert the Web Stream AsyncIterable to a Node stream.
         async function* streamGenerator() {
             const reader = gtwyStream.body!.getReader();
             try {
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    yield value;
+                    // Fastify expects Buffer or string in streams
+                    yield Buffer.from(value);
                 }
             } finally {
                 reader.releaseLock();
             }
         }
 
-        return reply.send(streamGenerator());
+        // Use standard Node stream to ensure Fastify stream pipeline and CORS headers are correctly applied
+        const { Readable } = await import('stream');
+        return reply.send(Readable.from(streamGenerator()));
     } catch (error: any) {
         return reply.status(500).send({ error: error.message });
     }
