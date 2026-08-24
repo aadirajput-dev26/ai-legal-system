@@ -57,7 +57,15 @@ export class GtwyService {
     }
 
     static async getResourcesByCase(collectionId: string) {
-        const response = await fetch(`${config.HIPPOCAMPUS_HOST_URL}/collection/${collectionId}/resources`, {
+        const url = `${config.HIPPOCAMPUS_HOST_URL}/collection/${collectionId}/resources`;
+        
+        console.log(`\n--- INTERNAL API CURL ---`);
+        console.log(`curl --request GET \\
+  --url '${url}' \\
+  --header 'pauthkey: ${config.GTWY_PAUTHKEY}'`);
+        console.log(`-------------------------\n`);
+
+        const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'pauthkey': config.GTWY_PAUTHKEY,

@@ -11,7 +11,10 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
     
     const caseObj = await CaseRepository.findById(caseId);
     if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
-    const targetCollectionId = caseObj.collection_id || caseId;
+    if (!caseObj.collection_id) {
+        return reply.status(400).send({ error: 'Case has no Hippocampus collection mapped to it. Please recreate the case.' });
+    }
+    const targetCollectionId = caseObj.collection_id;
 
     if (req.isMultipart()) {
         const parts = req.parts();
@@ -74,8 +77,11 @@ export const listDocuments = async (req: FastifyRequest<{ Params: { id: string }
         const caseId = req.params.id;
         const caseObj = await CaseRepository.findById(caseId);
         if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+        if (!caseObj.collection_id) {
+            return reply.status(400).send({ error: 'Case has no Hippocampus collection mapped to it. Please recreate the case.' });
+        }
         
-        const data = await GtwyService.getResourcesByCase(caseObj.collection_id || caseId);
+        const data = await GtwyService.getResourcesByCase(caseObj.collection_id);
         return reply.send(data);
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });

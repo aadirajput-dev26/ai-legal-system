@@ -55,11 +55,12 @@ export async function createCollection(caseName: string): Promise<HippocampusCol
         throw new Error('Hippocampus returned success=false on createCollection');
     }
 
+    const data = json.data as any;
     return {
-        // NOTE: collection_id for us is data._id (NOT data.collection_id)
-        collection_id: json.data._id,
-        name         : json.data.name,
-        created_at   : json.data.created_at,
+        // Handle both _id and collection_id just in case the API changed
+        collection_id: data.collection_id || data._id,
+        name         : data.name,
+        created_at   : data.created_at,
     };
 }
 
