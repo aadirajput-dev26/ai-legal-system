@@ -31,18 +31,29 @@ export const listChats = async (req: FastifyRequest<{ Params: { id: string } }>,
 export const getChatHistory = async (req: FastifyRequest<{ Params: { id: string, chatId: string } }>, reply: FastifyReply) => {
     try {
         const { chatId } = req.params;
-        // Verify chat exists
         const chat = await ChatThreadRepository.getById(chatId);
         if (!chat) return reply.status(404).send({ error: 'Chat not found' });
 
         const history = await GtwyService.getThreadHistory(config.GTWY_UNIVERSAL_AGENT_ID, chatId);
-        // Format history for the client. The frontend expects res.data to be an array of { role, content }
-        const messages = Array.isArray(history) ? history : (history.data || history.messages || []);
-        const formattedMessages = messages.map((m: any) => ({
-            role: m.role || (m.type === 'human' ? 'user' : 'assistant'),
-            content: m.content || m.text || ''
-        }));
-        return reply.send({ success: true, data: formattedMessages });
+
+        // GTWY history: { data: Array<{ user, llm_message, tools_call_data, created_at }> }
+        const entries: any[] = Array.isArray(history) ? history : (history.data || []);
+
+        const messages: { role: string; content: string; tools?: any[] }[] = [];
+        for (const entry of entries) {
+            if (entry.user) {
+                messages.push({ role: 'user', content: entry.user });
+            }
+            if (entry.llm_message) {
+                messages.push({
+                    role: 'assistant',
+                    content: entry.llm_message,
+                    tools: entry.tools_call_data?.length ? entry.tools_call_data : undefined,
+                });
+            }
+        }
+
+        return reply.send({ success: true, data: messages });
     } catch (error: any) {
         return reply.status(500).send({ error: error.message });
     }
