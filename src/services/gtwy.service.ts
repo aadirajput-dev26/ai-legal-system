@@ -30,8 +30,12 @@ export class GtwyService {
         const payload: any = {
             collectionId: collectionId,
             title: title,
-            description: description || title, // fallback to title if no description
-            ownerId: 'public'
+            description: description || title,
+            settings: {
+                strategy: 'agentic',
+                chunkSize: '4000'
+            },
+            collection_details: 'fastest'
         };
 
         if (isUrl) {
@@ -40,7 +44,12 @@ export class GtwyService {
             payload.content = contentOrUrl;
         }
 
-        const response = await fetch(`${config.HIPPOCAMPUS_HOST_URL}/resource`, {
+        const url = `${config.HIPPOCAMPUS_HOST_URL}/resource`;
+        console.log(`\n--- createResource CURL ---`);
+        console.log(`curl -X POST '${url}' -H 'Content-Type: application/json' -H 'pauthkey: REDACTED' -d '${JSON.stringify(payload)}'`);
+        console.log(`---------------------------\n`);
+
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
