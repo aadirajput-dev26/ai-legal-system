@@ -26,10 +26,11 @@ export class GtwyService {
         return data.file_url;
     }
 
-    static async createResource(caseId: string, title: string, contentOrUrl: string, isUrl: boolean) {
+    static async createResource(collectionId: string, title: string, contentOrUrl: string, isUrl: boolean, description?: string) {
         const payload: any = {
-            collectionId: caseId,
+            collectionId: collectionId,
             title: title,
+            description: description || title, // fallback to title if no description
             ownerId: 'public'
         };
 

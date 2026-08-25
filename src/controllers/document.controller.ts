@@ -7,6 +7,7 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
     let title: string = '';
     let type: string = '';
     let contentOrUrl: string = '';
+    let description: string = '';
     let isUrl = false;
     
     const caseObj = await CaseRepository.findById(caseId);
@@ -28,6 +29,7 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
             } else if (part.type === 'field') {
                 if (part.fieldname === 'title') title = part.value as string;
                 if (part.fieldname === 'type') type = part.value as string;
+                if (part.fieldname === 'description') description = part.value as string;
             }
         }
         
@@ -46,6 +48,7 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
         const body: any = req.body;
         title = body.title;
         type = body.type;
+        description = body.description || '';
         
         if (!title || !type) {
             return reply.status(400).send({ error: 'Title and type are required' });
@@ -65,7 +68,7 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
     }
 
     try {
-        const resource = await GtwyService.createResource(targetCollectionId, title, contentOrUrl, isUrl);
+        const resource = await GtwyService.createResource(targetCollectionId, title, contentOrUrl, isUrl, description);
         return reply.status(201).send({ success: true, resource });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
