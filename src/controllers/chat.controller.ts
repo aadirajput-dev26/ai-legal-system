@@ -39,17 +39,13 @@ export const getChatHistory = async (req: FastifyRequest<{ Params: { id: string,
         // GTWY history: { data: Array<{ user, llm_message, tools_call_data, created_at }> }
         const entries: any[] = Array.isArray(history) ? history : (history.data || []);
 
-        const messages: { role: string; content: string; tools?: any[] }[] = [];
+        const messages: { role: string; content: string }[] = [];
         for (const entry of entries) {
             if (entry.user) {
                 messages.push({ role: 'user', content: entry.user });
             }
             if (entry.llm_message) {
-                messages.push({
-                    role: 'assistant',
-                    content: entry.llm_message,
-                    tools: entry.tools_call_data?.length ? entry.tools_call_data : undefined,
-                });
+                messages.push({ role: 'assistant', content: entry.llm_message });
             }
         }
 
