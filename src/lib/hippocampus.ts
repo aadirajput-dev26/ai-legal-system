@@ -17,7 +17,7 @@ const HEADERS  = {
 };
 
 export interface HippocampusCollection {
-    collection_id: string;   // This is data._id from Hippocampus response
+    collection_id: string;   // This is data.hippocampus_response._id — the actual Hippocampus vector DB collection ID
     name         : string;
     created_at   : string;
 }
@@ -56,9 +56,12 @@ export async function createCollection(caseName: string): Promise<HippocampusCol
     }
 
     const data = json.data as any;
+    // data.collection_id is the GTWY wrapper's own DB record ID (not usable for /collection/:id/resources)
+    // data.hippocampus_response._id  is the actual Hippocampus vector-DB collection ID — this is what
+    // the /collection/:id/resources endpoint expects.
+    const hippocampusId = data.hippocampus_response?._id || data._id || data.collection_id;
     return {
-        // Handle both _id and collection_id just in case the API changed
-        collection_id: data.collection_id || data._id,
+        collection_id: hippocampusId,
         name         : data.name,
         created_at   : data.created_at,
     };

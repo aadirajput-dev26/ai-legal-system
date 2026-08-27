@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { CaseMemberRepository } from '../repositories/case-member.repository.js';
 import { CaseRepository } from '../repositories/case.repository.js';
 import { OrgMemberRepository } from '../repositories/org-member.repository.js';
+import { UserRepository } from '../repositories/user.repository.js';
 import type { Role } from '../types/index.js';
 
 // ─────────────────────────────────────────────
@@ -19,11 +20,11 @@ export async function listCaseMembers(req: FastifyRequest, reply: FastifyReply) 
 // POST /api/v1/cases/:id/members
 // Add an org member to a case (Case ADMIN only)
 // ─────────────────────────────────────────────
-interface AddCaseMemberBody { userId: string; role: Role; }
+interface AddCaseMemberBody { email: string; role: Role; }
 
 export async function addCaseMember(req: FastifyRequest, reply: FastifyReply) {
     const { id: caseId } = req.params as { id: string };
-    const { userId: targetUserId, role } = req.body as AddCaseMemberBody;
+    const { email, role } = req.body as AddCaseMemberBody;
 
     // Get case to find parent org
     const c = await CaseRepository.findById(caseId);
@@ -36,16 +37,24 @@ export async function addCaseMember(req: FastifyRequest, reply: FastifyReply) {
 
     const orgId = c.organisation_id;
 
-    // Prerequisite: target user must already be an org member
-    const orgRole = await OrgMemberRepository.getRole(orgId, targetUserId);
-    if (!orgRole) {
+    // Look up user by email
+    const user = await UserRepository.findByEmail(email);
+    if (!user) {
         return reply.code(400).send({
             success: false,
             error: {
-                code   : 'NOT_ORG_MEMBER',
-                message: 'The user must be a member of the parent organisation before being added to a case.',
+                code   : 'USER_NOT_FOUND',
+                message: 'User not found. They must sign up first before you can invite them.',
             },
         });
+    }
+
+    const targetUserId = user.id;
+
+    // If target user is not an org member, automatically add them as a VIEWER
+    const orgRole = await OrgMemberRepository.getRole(orgId, targetUserId);
+    if (!orgRole) {
+        await OrgMemberRepository.addMember(orgId, targetUserId, 'VIEWER');
     }
 
     await CaseMemberRepository.addMember(caseId, targetUserId, role);

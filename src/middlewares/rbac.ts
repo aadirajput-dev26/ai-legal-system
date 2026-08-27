@@ -1,5 +1,6 @@
 import { OrgMemberRepository } from '../repositories/org-member.repository.js';
 import { CaseMemberRepository } from '../repositories/case-member.repository.js';
+import { CaseRepository } from '../repositories/case.repository.js';
 import type { Role } from '../types/index.js';
 
 /**
@@ -42,7 +43,18 @@ export function requireCaseRole(allowedRoles: Role[]) {
         const { id: caseId } = req.params as { id: string };
         const userId = (req.user as { userId: string }).userId;
 
-        const role = await CaseMemberRepository.getRole(caseId, userId);
+        let role = await CaseMemberRepository.getRole(caseId, userId);
+
+        // If not explicitly in case_members, check if they are an ORG_ADMIN
+        if (!role) {
+            const caseObj = await CaseRepository.findById(caseId);
+            if (caseObj) {
+                const orgRole = await OrgMemberRepository.getRole(caseObj.organisation_id, userId);
+                if (orgRole === 'ADMIN') {
+                    role = 'ADMIN';
+                }
+            }
+        }
 
         if (!role || !allowedRoles.includes(role)) {
             reply.code(403).send({

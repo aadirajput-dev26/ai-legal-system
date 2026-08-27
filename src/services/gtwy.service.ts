@@ -75,19 +75,31 @@ export class GtwyService {
   --header 'pauthkey: ${config.GTWY_PAUTHKEY}'`);
         console.log(`-------------------------\n`);
 
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'pauthkey': config.GTWY_PAUTHKEY,
-            },
-        });
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'pauthkey': config.GTWY_PAUTHKEY,
+                    },
+                });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to get resources: ${response.status} ${errorText}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to get resources: ${response.status} ${errorText}`);
+                }
+
+                return await response.json();
+            } catch (err: any) {
+                retries--;
+                if (retries === 0 || !err.message.includes('fetch failed')) {
+                    throw err;
+                }
+                console.log(`Fetch failed, retrying... (${retries} attempts left)`);
+                await new Promise(res => setTimeout(res, 1000)); // wait 1s before retry
+            }
         }
-
-        return response.json();
     }
 
     static async sendMessage(agentId: string, threadId: string, message: string, variables?: Record<string, string>) {

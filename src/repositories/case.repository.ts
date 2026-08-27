@@ -61,10 +61,12 @@ export class CaseRepository {
     static async listByUserAndOrg(orgId: string, userId: string): Promise<CaseWithRoleRow[]> {
         const result = await pool.query<CaseWithRoleRow>(
             `SELECT c.id, c.title, c.status, c.case_number, c.court,
-                    c.next_hearing_date, c.created_at, cm.role
+                    c.next_hearing_date, c.created_at, COALESCE(cm.role, 'ADMIN') as role
              FROM cases c
-             JOIN case_members cm ON cm.case_id = c.id
-             WHERE c.organisation_id = $1 AND cm.user_id = $2
+             JOIN organisation_members om ON c.organisation_id = om.organisation_id AND om.user_id = $2
+             LEFT JOIN case_members cm ON cm.case_id = c.id AND cm.user_id = $2
+             WHERE c.organisation_id = $1 
+               AND (om.role = 'ADMIN' OR cm.user_id IS NOT NULL)
              ORDER BY c.created_at DESC`,
             [orgId, userId]
         );
