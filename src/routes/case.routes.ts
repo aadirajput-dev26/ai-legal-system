@@ -6,6 +6,7 @@ import * as caseMemberController from '../controllers/case-member.controller.js'
 import * as documentController from '../controllers/document.controller.js';
 import * as chatController from '../controllers/chat.controller.js';
 import * as hearingController from '../controllers/hearing.controller.js';
+import * as toolController from '../controllers/tool.controller.js';
 
 export async function caseRoutes(app: FastifyInstance) {
     // ── Cases within an Org ────────────────────────────────────────
@@ -41,4 +42,10 @@ export async function caseRoutes(app: FastifyInstance) {
     // ── Hearings ───────────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/hearings',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, hearingController.listHearings);
     app.post<{ Params: { id: string } }>('/cases/:id/hearings', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, hearingController.createHearing);
+
+    // ── Tools ──────────────────────────────────────────────────────
+    app.get<{ Params: { id: string } }>('/cases/:id/tools', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, toolController.listTools);
+    app.post<{ Params: { id: string } }>('/cases/:id/tools', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, toolController.createOrUpdateTool);
+    app.delete<{ Params: { id: string, scriptId: string } }>('/cases/:id/tools/:scriptId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, toolController.deleteTool);
+    app.get<{ Params: { id: string } }>('/cases/:id/tools/token', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, toolController.getViasocketToken);
 }

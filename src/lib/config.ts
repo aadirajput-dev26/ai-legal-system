@@ -11,6 +11,9 @@ const env = z.object({
     GTWY_PAUTHKEY        : z.string().min(1),
     GTWY_UNIVERSAL_AGENT_ID : z.string().min(1),
     NOTIFICATION_WEBHOOK_URL : z.string().url().optional(),
+    VIASOCKET_ACCESS_KEY     : z.string().optional(),
+    VIASOCKET_ORG_ID         : z.string().optional(),
+    VIASOCKET_PROJECT_ID     : z.string().optional(),
 });
 
 export const config = env.parse(process.env);
