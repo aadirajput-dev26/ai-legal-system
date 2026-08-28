@@ -14,6 +14,7 @@ const env = z.object({
     VIASOCKET_ACCESS_KEY     : z.string().optional(),
     VIASOCKET_ORG_ID         : z.string().optional(),
     VIASOCKET_PROJECT_ID     : z.string().optional(),
+    PAUTHKEY:z.string().min(1),
 });
 
 export const config = env.parse(process.env);

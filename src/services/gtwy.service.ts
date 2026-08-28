@@ -8,7 +8,7 @@ export class GtwyService {
         const response = await fetch('https://api.gtwy.ai/image/processing/upload', {
             method: 'POST',
             headers: {
-                'pauthkey': config.GTWY_PAUTHKEY,
+                'pauthkey': config.PAUTHKEY,
             },
             body: formData,
         });
