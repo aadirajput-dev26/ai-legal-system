@@ -120,3 +120,4 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         return reply.status(500).send({ error: error.message });
     }
 };
+

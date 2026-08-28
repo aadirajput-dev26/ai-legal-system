@@ -26,16 +26,17 @@ export class GtwyService {
         return data.file_url;
     }
 
-    static async createResource(collectionId: string, title: string, contentOrUrl: string, isUrl: boolean, description?: string, collectionName?: string) {
+    static async createResource(collectionId: string, title: string, contentOrUrl: string, isUrl: boolean, description?: string) {
         const payload: any = {
             collectionId: collectionId,
             title: title,
             description: description || title,
+            ownerId: 'public',
             settings: {
-                strategy: 'agentic',
-                chunkSize: '4000'
-            },
-            collection_details: collectionName || 'fastest'
+                strategy: 'recursive',
+                chunkSize: 1000,
+                chunkOverlap: 100
+            }
         };
 
         if (isUrl) {
@@ -46,14 +47,14 @@ export class GtwyService {
 
         const url = `${config.HIPPOCAMPUS_HOST_URL}/resource`;
         console.log(`\n--- createResource CURL ---`);
-        console.log(`curl -X POST '${url}' -H 'Content-Type: application/json' -H 'pauthkey: REDACTED' -d '${JSON.stringify(payload)}'`);
+        console.log(`curl -X POST '${url}' -H 'Content-Type: application/json' -H 'x-api-key: REDACTED' -d '${JSON.stringify(payload)}'`);
         console.log(`---------------------------\n`);
 
         const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'pauthkey': config.GTWY_PAUTHKEY,
+                'x-api-key': config.GTWY_PAUTHKEY,
             },
             body: JSON.stringify(payload),
         });
@@ -72,7 +73,7 @@ export class GtwyService {
         console.log(`\n--- INTERNAL API CURL ---`);
         console.log(`curl --request GET \\
   --url '${url}' \\
-  --header 'pauthkey: ${config.GTWY_PAUTHKEY}'`);
+  --header 'x-api-key: REDACTED'`);
         console.log(`-------------------------\n`);
 
         let retries = 3;
@@ -81,7 +82,7 @@ export class GtwyService {
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
-                        'pauthkey': config.GTWY_PAUTHKEY,
+                        'x-api-key': config.GTWY_PAUTHKEY,
                     },
                 });
 
