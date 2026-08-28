@@ -26,19 +26,26 @@ export interface HippocampusCollection {
 // Create a new collection in Hippocampus for a case
 // ─────────────────────────────────────────────
 export async function createCollection(caseName: string): Promise<HippocampusCollection> {
-    const response = await fetch(`${BASE_URL}/collection`, {
+    const payload = {
+        name: caseName,
+        settings: {
+            denseModel: 'BAAI/bge-large-en-v1.5',
+            sparseModel: 'Qdrant/bm25',
+            rerankerModel: 'colbert-ir/colbertv2.0',
+            chunkSize: 1000,
+            chunkOverlap: 100,
+        },
+    };
+
+    const url = `${BASE_URL}/collection`;
+    console.log(`\n--- createCollection CURL ---`);
+    console.log(`curl -X POST '${url}' -H 'Content-Type: application/json' -H 'x-api-key: REDACTED' -d '${JSON.stringify(payload)}'`);
+    console.log(`-----------------------------\n`);
+
+    const response = await fetch(url, {
         method: 'POST',
         headers: HEADERS,
-        body: JSON.stringify({
-            name: caseName,
-            settings: {
-                denseModel: 'BAAI/bge-large-en-v1.5',
-                sparseModel: 'Qdrant/bm25',
-                rerankerModel: 'colbert-ir/colbertv2.0',
-                chunkSize: 1000,
-                chunkOverlap: 100,
-            },
-        }),
+        body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
