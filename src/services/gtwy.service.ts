@@ -131,7 +131,7 @@ export class GtwyService {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'pauthkey': config.GTWY_PAUTHKEY,
+                'pauthkey': config.PAUTHKEY,
             },
             body: JSON.stringify({
                 agent_id: agentId,
