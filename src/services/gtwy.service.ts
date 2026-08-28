@@ -154,7 +154,7 @@ export class GtwyService {
         const response = await fetch(`https://db.gtwy.ai/api/history/${agentId}/${threadId}/${threadId}?page=1&limit=40&user_feedback=all&error=false`, {
             method: 'GET',
             headers: {
-                'pauthkey': config.GTWY_PAUTHKEY,
+                'pauthkey': config.PAUTHKEY,
             }
         });
 
