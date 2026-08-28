@@ -68,7 +68,7 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
     }
 
     try {
-        const resource = await GtwyService.createResource(targetCollectionId, title, contentOrUrl, isUrl, description);
+        const resource = await GtwyService.createResource(targetCollectionId, title, contentOrUrl, isUrl, description, caseObj.title);
         return reply.status(201).send({ success: true, resource });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });

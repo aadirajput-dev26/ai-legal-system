@@ -26,7 +26,7 @@ export class GtwyService {
         return data.file_url;
     }
 
-    static async createResource(collectionId: string, title: string, contentOrUrl: string, isUrl: boolean, description?: string) {
+    static async createResource(collectionId: string, title: string, contentOrUrl: string, isUrl: boolean, description?: string, collectionName?: string) {
         const payload: any = {
             collectionId: collectionId,
             title: title,
@@ -35,7 +35,7 @@ export class GtwyService {
                 strategy: 'agentic',
                 chunkSize: '4000'
             },
-            collection_details: 'fastest'
+            collection_details: collectionName || 'fastest'
         };
 
         if (isUrl) {

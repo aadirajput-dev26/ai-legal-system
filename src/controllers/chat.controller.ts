@@ -76,11 +76,17 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         // Variables required by GTWY agent tools and personalized context
         const variables = {
             caseId: caseId,
+            case_id: caseId,
             collectionId: caseRecord.collection_id || '',
+            collection_id: caseRecord.collection_id || '',
             accessToken: accessToken,
+            access_token: accessToken,
             caseName: caseRecord.title || '',
+            case_name: caseRecord.title || '',
             caseDescription: caseRecord.description || '',
-            caseInstructions: caseRecord.instructions || ''
+            case_description: caseRecord.description || '',
+            caseInstructions: caseRecord.instructions || '',
+            case_instructions: caseRecord.instructions || ''
         };
 
         // Get the raw SSE stream from GTWY
