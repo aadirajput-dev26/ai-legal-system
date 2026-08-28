@@ -85,7 +85,7 @@ export const listDocuments = async (req: FastifyRequest<{ Params: { id: string }
         }
         
         const data = await GtwyService.getResourcesByCase(caseObj.collection_id);
-        return reply.send(data);
+        return reply.send({ success: true, data: data });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
     }
