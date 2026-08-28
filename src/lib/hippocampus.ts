@@ -56,10 +56,10 @@ export async function createCollection(caseName: string): Promise<HippocampusCol
     }
 
     const data = json.data as any;
-    // data.collection_id is the GTWY wrapper's own DB record ID (not usable for /collection/:id/resources)
-    // data.hippocampus_response._id  is the actual Hippocampus vector-DB collection ID — this is what
-    // the /collection/:id/resources endpoint expects.
-    const hippocampusId = data.hippocampus_response?._id || data._id || data.collection_id;
+    // We must return the GTWY wrapper's collection record ID (data._id).
+    // Using the raw hippocampus_response._id causes RAG resources and Gateway variables 
+    // to map to the wrong or default knowledgebases.
+    const hippocampusId = data._id || data.collection_id;
     return {
         collection_id: hippocampusId,
         name         : data.name,
