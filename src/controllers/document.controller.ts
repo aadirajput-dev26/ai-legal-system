@@ -90,3 +90,40 @@ export const listDocuments = async (req: FastifyRequest<{ Params: { id: string }
         return reply.status(500).send({ error: err.message });
     }
 };
+
+export const updateDocument = async (req: FastifyRequest<{ Params: { id: string; resourceId: string } }>, reply: FastifyReply) => {
+    try {
+        const { id: caseId, resourceId } = req.params;
+        const body = req.body as { title?: string; description?: string; type?: string; content?: string };
+
+        if (!body.title?.trim()) {
+            return reply.status(400).send({ error: 'Title is required' });
+        }
+
+        // Verify case exists (auth is already handled by middleware)
+        const caseObj = await CaseRepository.findById(caseId);
+        if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+
+        // Only pass content if this is a TEXT resource — PDF and LINK content is not editable
+        const contentToUpdate = body.type === 'TEXT' ? body.content?.trim() : undefined;
+
+        const updated = await GtwyService.updateResource(resourceId, body.title.trim(), body.description?.trim(), contentToUpdate);
+        return reply.send({ success: true, resource: updated });
+    } catch (err: any) {
+        return reply.status(500).send({ error: err.message });
+    }
+};
+
+export const deleteDocument = async (req: FastifyRequest<{ Params: { id: string; resourceId: string } }>, reply: FastifyReply) => {
+    try {
+        const { id: caseId, resourceId } = req.params;
+
+        const caseObj = await CaseRepository.findById(caseId);
+        if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+
+        const result = await GtwyService.deleteResource(resourceId);
+        return reply.send({ success: true, result });
+    } catch (err: any) {
+        return reply.status(500).send({ error: err.message });
+    }
+};

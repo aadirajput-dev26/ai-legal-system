@@ -67,6 +67,47 @@ export class GtwyService {
         return response.json();
     }
 
+    static async updateResource(resourceId: string, title: string, description?: string, content?: string) {
+        const payload: any = { title };
+        if (description !== undefined) payload.description = description;
+        // Only pass content for TEXT type resources — for PDF/LINK, content is not re-editable
+        if (content !== undefined) payload.content = content;
+
+        const url = `${config.HIPPOCAMPUS_HOST_URL}/resource/${resourceId}`;
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': config.GTWY_PAUTHKEY,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to update resource: ${response.status} ${errorText}`);
+        }
+
+        return response.json();
+    }
+
+    static async deleteResource(resourceId: string) {
+        const url = `${config.HIPPOCAMPUS_HOST_URL}/resource/${resourceId}`;
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'x-api-key': config.GTWY_PAUTHKEY,
+            },
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to delete resource: ${response.status} ${errorText}`);
+        }
+
+        return response.json();
+    }
+
     static async getResourcesByCase(collectionId: string) {
         const url = `${config.HIPPOCAMPUS_HOST_URL}/collection/${collectionId}/resources`;
         

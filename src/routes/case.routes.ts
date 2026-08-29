@@ -32,6 +32,8 @@ export async function caseRoutes(app: FastifyInstance) {
     // ── Case Documents ─────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/documents', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, documentController.listDocuments);
     app.post<{ Params: { id: string } }>('/cases/:id/documents', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, documentController.createDocument);
+    app.patch<{ Params: { id: string; resourceId: string } }>('/cases/:id/documents/:resourceId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, documentController.updateDocument);
+    app.delete<{ Params: { id: string; resourceId: string } }>('/cases/:id/documents/:resourceId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, documentController.deleteDocument);
 
     // ── Chat & Orchestrator ────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/chats', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, chatController.listChats);
