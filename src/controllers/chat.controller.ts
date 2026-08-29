@@ -1,6 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { ChatThreadRepository } from '../repositories/chat-thread.repository.js';
 import { CaseRepository } from '../repositories/case.repository.js';
+import { ToolRepository } from '../repositories/tool.repository.js';
+import pool from '../lib/db.js';
 import { GtwyService } from '../services/gtwy.service.js';
 import { AgentService } from '../services/agent.service.js';
 import { config } from '../lib/config.js';
@@ -73,20 +75,38 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         const authHeader = req.headers.authorization || '';
         const accessToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
 
+        // Fetch tools for case context
+        let toolsSummary = '';
+        try {
+            const toolRepo = new ToolRepository(pool);
+            const toolsList = await toolRepo.findByCaseId(caseId);
+            toolsSummary = toolsList.map((t: any) => `${t.title}: ${t.description || 'No description'}`).join('\n');
+        } catch (err) {
+            console.error("Failed to fetch tools for variables context:", err);
+        }
+
+        // Fetch resources/documents for case context
+        let resourcesSummary = '';
+        if (caseRecord.collection_id) {
+            try {
+                const resData = await GtwyService.getResourcesByCase(caseRecord.collection_id);
+                const resources = resData?.resources || [];
+                resourcesSummary = resources.map((r: any) => `${r.title}: ${r.description || 'No description'}`).join('\n');
+            } catch (err) {
+                console.error("Failed to fetch resources for variables context:", err);
+            }
+        }
+
         // Variables required by GTWY agent tools and personalized context
         const variables = {
             caseId: caseId,
-            case_id: caseId,
             collectionId: caseRecord.collection_id || '',
-            collection_id: caseRecord.collection_id || '',
             accessToken: accessToken,
-            access_token: accessToken,
             caseName: caseRecord.title || '',
-            case_name: caseRecord.title || '',
             caseDescription: caseRecord.description || '',
-            case_description: caseRecord.description || '',
             caseInstructions: caseRecord.instructions || '',
-            case_instructions: caseRecord.instructions || ''
+            availableTools: toolsSummary || 'None',
+            availableResources: resourcesSummary || 'None'
         };
 
         // Get the raw SSE stream from GTWY
