@@ -98,4 +98,28 @@ export class ToolRepository {
     const result = await this.pool.query(query, [case_id]);
     return result.rows;
   }
+
+  /**
+   * Returns all tools the user has access to within the org,
+   * annotated with case_title and case_id — for the cross-case import picker.
+   * Excludes tools already present in the target case.
+   */
+  async findByOrgAndUser(orgId: string, userId: string, excludeCaseId: string): Promise<(ToolRecord & { case_title: string })[]> {
+    const query = `
+      SELECT t.*, c.title as case_title
+      FROM tools t
+      JOIN cases c ON t.case_id = c.id
+      JOIN organisation_members om ON c.organisation_id = om.organisation_id AND om.user_id = $2
+      LEFT JOIN case_members cm ON cm.case_id = c.id AND cm.user_id = $2
+      WHERE c.organisation_id = $1
+        AND t.case_id != $3
+        AND (om.role = 'ADMIN' OR cm.user_id IS NOT NULL)
+        AND t.script_id NOT IN (
+          SELECT script_id FROM tools WHERE case_id = $3
+        )
+      ORDER BY c.title, t.title;
+    `;
+    const result = await this.pool.query(query, [orgId, userId, excludeCaseId]);
+    return result.rows;
+  }
 }

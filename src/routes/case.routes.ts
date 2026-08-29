@@ -49,5 +49,7 @@ export async function caseRoutes(app: FastifyInstance) {
     app.get<{ Params: { id: string } }>('/cases/:id/tools', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, toolController.listTools);
     app.post<{ Params: { id: string } }>('/cases/:id/tools', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, toolController.createOrUpdateTool);
     app.delete<{ Params: { id: string, scriptId: string } }>('/cases/:id/tools/:scriptId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, toolController.deleteTool);
+    app.post<{ Params: { id: string } }>('/cases/:id/tools/import', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, toolController.importTool);
+    app.get<{ Params: { id: string; orgId: string } }>('/organisations/:orgId/cases/:id/tools/importable', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, toolController.listImportableTools);
     app.get<{ Params: { id: string } }>('/cases/:id/tools/token', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, toolController.getViasocketToken);
 }
