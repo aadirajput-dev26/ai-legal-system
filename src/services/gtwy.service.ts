@@ -75,7 +75,7 @@ export class GtwyService {
 
         const url = `${config.HIPPOCAMPUS_HOST_URL}/resource/${resourceId}`;
         const response = await fetch(url, {
-            method: 'PATCH',
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'x-api-key': config.GTWY_PAUTHKEY,
@@ -103,6 +103,23 @@ export class GtwyService {
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to delete resource: ${response.status} ${errorText}`);
+        }
+
+        return response.json();
+    }
+
+    static async getResource(resourceId: string) {
+        const url = `${config.HIPPOCAMPUS_HOST_URL}/resource/${resourceId}`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'x-api-key': config.GTWY_PAUTHKEY,
+            },
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch resource: ${response.status} ${errorText}`);
         }
 
         return response.json();

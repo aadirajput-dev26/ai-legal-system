@@ -91,6 +91,19 @@ export const listDocuments = async (req: FastifyRequest<{ Params: { id: string }
     }
 };
 
+export const getDocument = async (req: FastifyRequest<{ Params: { id: string; resourceId: string } }>, reply: FastifyReply) => {
+    try {
+        const { id: caseId, resourceId } = req.params;
+        const caseObj = await CaseRepository.findById(caseId);
+        if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+        
+        const data = await GtwyService.getResource(resourceId);
+        return reply.send({ success: true, data });
+    } catch (err: any) {
+        return reply.status(500).send({ error: err.message });
+    }
+};
+
 export const updateDocument = async (req: FastifyRequest<{ Params: { id: string; resourceId: string } }>, reply: FastifyReply) => {
     try {
         const { id: caseId, resourceId } = req.params;
