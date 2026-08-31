@@ -8,6 +8,7 @@ import { config } from './lib/config.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { organisationRoutes } from './routes/organisation.routes.js';
 import { caseRoutes } from './routes/case.routes.js';
+import { notificationRoutes } from './routes/notification.routes.js';
 
 export const App = () => {
     const app = Fastify({
@@ -45,6 +46,7 @@ export const App = () => {
     app.register(authRoutes,         { prefix: '/api/v1/auth' });
     app.register(organisationRoutes, { prefix: '/api/v1/organisations' });
     app.register(caseRoutes,         { prefix: '/api/v1' });
+    app.register(notificationRoutes, { prefix: '/api/v1' });
 
     return app;
 };

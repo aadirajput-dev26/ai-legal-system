@@ -75,6 +75,21 @@ export const createDocument = async (req: FastifyRequest<{ Params: { id: string 
     }
 };
 
+const normalizeDocType = (doc: any): string => {
+    if (doc.type && typeof doc.type === 'string' && doc.type.trim()) {
+        const t = doc.type.trim().toUpperCase();
+        if (t === 'PDF' || t === 'LINK' || t === 'TEXT') return t;
+    }
+    if (doc.url) {
+        const u = String(doc.url).toLowerCase();
+        if (u.endsWith('.pdf') || u.includes('.pdf?') || u.includes('/pdf/')) {
+            return 'PDF';
+        }
+        return 'LINK';
+    }
+    return 'TEXT';
+};
+
 export const listDocuments = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
         const caseId = req.params.id;
@@ -85,7 +100,12 @@ export const listDocuments = async (req: FastifyRequest<{ Params: { id: string }
         }
         
         const data = await GtwyService.getResourcesByCase(caseObj.collection_id);
-        return reply.send({ success: true, data: data });
+        const list = Array.isArray(data) ? data : (data?.resources || []);
+        const normalized = list.map((doc: any) => ({
+            ...doc,
+            type: normalizeDocType(doc),
+        }));
+        return reply.send({ success: true, data: normalized });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
     }
@@ -98,7 +118,8 @@ export const getDocument = async (req: FastifyRequest<{ Params: { id: string; re
         if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
         
         const data = await GtwyService.getResource(resourceId);
-        return reply.send({ success: true, data });
+        const normalized = data ? { ...data, type: normalizeDocType(data) } : data;
+        return reply.send({ success: true, data: normalized });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
     }
@@ -136,6 +157,38 @@ export const deleteDocument = async (req: FastifyRequest<{ Params: { id: string;
 
         const result = await GtwyService.deleteResource(resourceId);
         return reply.send({ success: true, result });
+    } catch (err: any) {
+        return reply.status(500).send({ error: err.message });
+    }
+};
+
+export const listOrgDocuments = async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+        const { id: orgId } = req.params as { id: string };
+        const { userId } = req.user;
+        const cases = await CaseRepository.listByUserAndOrg(orgId, userId);
+        
+        const docsPromises = cases.map(async (c) => {
+            if (!c.collection_id) return [];
+            try {
+                const res = await GtwyService.getResourcesByCase(c.collection_id);
+                const list = Array.isArray(res) ? res : (res?.resources || []);
+                return list.map((doc: any) => ({
+                    ...doc,
+                    type: normalizeDocType(doc),
+                    case_id: c.id,
+                    case_title: c.title,
+                    case_number: c.case_number,
+                    court: c.court,
+                }));
+            } catch (err) {
+                return [];
+            }
+        });
+
+        const results = await Promise.all(docsPromises);
+        const allDocs = results.flat();
+        return reply.send({ success: true, data: allDocs, cases });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
     }
