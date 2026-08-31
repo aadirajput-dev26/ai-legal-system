@@ -28,12 +28,16 @@ interface CreateCaseBody {
     case_type  ?: string;
     instructions?: string;
     filing_date?: string;
+    stage      ?: string;
+    judge      ?: string;
+    client_name?: string;
+    opposing_party?: string;
 }
 
 export async function createCase(req: FastifyRequest, reply: FastifyReply) {
     const { id: orgId } = req.params as { id: string };
     const { userId } = req.user;
-    const { title, description, case_number, court, case_type, instructions, filing_date } = req.body as CreateCaseBody;
+    const { title, description, case_number, court, case_type, instructions, filing_date, stage, judge, client_name, opposing_party } = req.body as CreateCaseBody;
 
     // Step 1: Provision Hippocampus collection for this case
     const collection = await createCollection(title);
@@ -49,6 +53,10 @@ export async function createCase(req: FastifyRequest, reply: FastifyReply) {
             caseType: case_type,
             instructions,
             filingDate: filing_date,
+            stage,
+            judge,
+            clientName: client_name,
+            opposingParty: opposing_party,
             userId,
         });
 
@@ -88,6 +96,10 @@ interface UpdateCaseBody {
     case_type        ?: string;
     instructions     ?: string;
     next_hearing_date?: string;
+    stage            ?: string;
+    judge            ?: string;
+    client_name      ?: string;
+    opposing_party   ?: string;
 }
 
 export async function updateCase(req: FastifyRequest, reply: FastifyReply) {
@@ -103,6 +115,10 @@ export async function updateCase(req: FastifyRequest, reply: FastifyReply) {
         case_type: body.case_type,
         instructions: body.instructions,
         next_hearing_date: body.next_hearing_date,
+        stage: body.stage,
+        judge: body.judge,
+        client_name: body.client_name,
+        opposing_party: body.opposing_party,
     });
 
     if (!c) {
@@ -143,4 +159,17 @@ export async function deleteCase(req: FastifyRequest, reply: FastifyReply) {
     }
 
     return reply.code(200).send({ success: true, data: { message: 'Case deleted.' } });
+}
+
+// ─────────────────────────────────────────────
+// GET /api/v1/organisations/:id/calendar
+// Aggregated docket with hearings, tasks, and case hearing dates
+// ─────────────────────────────────────────────
+export async function getOrgCalendar(req: FastifyRequest, reply: FastifyReply) {
+    const { id: orgId } = req.params as { id: string };
+    const { userId } = req.user;
+
+    const calendarData = await CaseRepository.getCalendar(orgId, userId);
+
+    return reply.code(200).send({ success: true, data: calendarData });
 }

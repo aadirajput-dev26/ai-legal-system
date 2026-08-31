@@ -7,12 +7,21 @@ import * as documentController from '../controllers/document.controller.js';
 import * as chatController from '../controllers/chat.controller.js';
 import * as hearingController from '../controllers/hearing.controller.js';
 import * as toolController from '../controllers/tool.controller.js';
+import * as taskController from '../controllers/task.controller.js';
 
 export async function caseRoutes(app: FastifyInstance) {
     // ── Cases within an Org ────────────────────────────────────────
     app.get('/organisations/:id/cases', {
         preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR', 'VIEWER'])]
     }, caseController.listCases);
+
+    app.get('/organisations/:id/calendar', {
+        preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR', 'VIEWER'])]
+    }, caseController.getOrgCalendar);
+
+    app.get('/organisations/:id/documents', {
+        preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR', 'VIEWER'])]
+    }, documentController.listOrgDocuments);
 
     app.post('/organisations/:id/cases', {
         preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR'])]
@@ -45,6 +54,12 @@ export async function caseRoutes(app: FastifyInstance) {
     // ── Hearings ───────────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/hearings',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, hearingController.listHearings);
     app.post<{ Params: { id: string } }>('/cases/:id/hearings', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, hearingController.createHearing);
+
+    // ── Tasks ──────────────────────────────────────────────────────
+    app.get<{ Params: { id: string } }>('/cases/:id/tasks', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, taskController.listTasks);
+    app.post<{ Params: { id: string } }>('/cases/:id/tasks', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, taskController.createTask);
+    app.patch<{ Params: { id: string, taskId: string } }>('/cases/:id/tasks/:taskId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, taskController.updateTask);
+    app.delete<{ Params: { id: string, taskId: string } }>('/cases/:id/tasks/:taskId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, taskController.deleteTask);
 
     // ── Tools ──────────────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/tools', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, toolController.listTools);
