@@ -67,8 +67,8 @@ export async function login(req: FastifyRequest, reply: FastifyReply) {
 
     const payload: JwtPayload = { userId: user.id, email: user.email, name: user.name };
 
-    // Access token — short-lived (15 min)
-    const accessToken = req.server.jwt.sign(payload, { expiresIn: '15m' });
+    // Access token — extended TTL (7 days)
+    const accessToken = req.server.jwt.sign(payload, { expiresIn: '7d' });
 
     // Refresh token — long-lived (7 days), signed with separate secret
     const refreshToken = req.server.jwt.sign(
@@ -129,7 +129,7 @@ export async function refresh(req: FastifyRequest, reply: FastifyReply) {
 
     const newAccessToken = req.server.jwt.sign(
         { userId: payload.userId, email: payload.email, name: payload.name },
-        { expiresIn: '15m' }
+        { expiresIn: '7d' }
     );
 
     return reply.code(200).send({
