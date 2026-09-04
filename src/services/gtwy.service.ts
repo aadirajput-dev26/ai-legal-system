@@ -91,6 +91,32 @@ export class GtwyService {
         return response.json();
     }
 
+    /**
+     * replaceResourceFast — Atomic Swap for PDF / LINK / TEXT resources.
+     *
+     * Creates the new resource (triggering fresh vector re-indexing) and
+     * immediately returns it. The old resource deletion is fired off as a
+     * non-blocking background promise so the HTTP response is instant (<500ms).
+     */
+    static async replaceResourceFast(
+        collectionId: string,
+        oldResourceId: string,
+        title: string,
+        contentOrUrl: string,
+        isUrl: boolean,
+        description?: string
+    ) {
+        // Step 1: Create new vector-indexed resource first (safe — old still exists)
+        const newResource = await this.createResource(collectionId, title, contentOrUrl, isUrl, description);
+
+        // Step 2: Fire-and-forget cleanup of old stale vectors — does NOT block response
+        this.deleteResource(oldResourceId).catch((err) => {
+            console.error(`[Background Cleanup] Failed to delete old resource ${oldResourceId}:`, err);
+        });
+
+        return newResource;
+    }
+
     static async deleteResource(resourceId: string) {
         const url = `${config.HIPPOCAMPUS_HOST_URL}/resource/${resourceId}`;
         const response = await fetch(url, {

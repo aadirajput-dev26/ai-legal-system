@@ -128,21 +128,87 @@ export const getDocument = async (req: FastifyRequest<{ Params: { id: string; re
 export const updateDocument = async (req: FastifyRequest<{ Params: { id: string; resourceId: string } }>, reply: FastifyReply) => {
     try {
         const { id: caseId, resourceId } = req.params;
-        const body = req.body as { title?: string; description?: string; type?: string; content?: string };
 
-        if (!body.title?.trim()) {
-            return reply.status(400).send({ error: 'Title is required' });
-        }
-
-        // Verify case exists (auth is already handled by middleware)
         const caseObj = await CaseRepository.findById(caseId);
         if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+        if (!caseObj.collection_id) return reply.status(400).send({ error: 'Case has no Hippocampus collection.' });
 
-        // Only pass content if this is a TEXT resource — PDF and LINK content is not editable
-        const contentToUpdate = body.type === 'TEXT' ? body.content?.trim() : undefined;
+        let title = '';
+        let description = '';
+        let type = '';
+        let contentOrUrl = '';
+        let isUrl = false;
+        let hasContentChange = false; // true when file/url/text content actually changed
 
-        const updated = await GtwyService.updateResource(resourceId, body.title.trim(), body.description?.trim(), contentToUpdate);
-        return reply.send({ success: true, resource: updated });
+        // ── Multipart: PDF file replacement ────────────────────────────────
+        if (req.isMultipart()) {
+            const parts = req.parts();
+            let fileBuffer: Buffer | null = null;
+            let filename = '';
+
+            for await (const part of parts) {
+                if (part.type === 'file' && part.fieldname === 'file') {
+                    fileBuffer = await part.toBuffer();
+                    filename = part.filename;
+                } else if (part.type === 'field') {
+                    if (part.fieldname === 'title') title = part.value as string;
+                    if (part.fieldname === 'description') description = part.value as string;
+                    if (part.fieldname === 'type') type = part.value as string;
+                }
+            }
+
+            if (!title) return reply.status(400).send({ error: 'Title is required' });
+
+            if (fileBuffer) {
+                // New PDF uploaded — upload it and flag a content change
+                try {
+                    const fileUrl = await GtwyService.uploadPdf(fileBuffer, filename);
+                    contentOrUrl = fileUrl;
+                    isUrl = true;
+                    hasContentChange = true;
+                } catch (err: any) {
+                    return reply.status(500).send({ error: `PDF upload failed: ${err.message}` });
+                }
+            }
+
+        } else {
+            // ── JSON body: TEXT content or LINK URL update ──────────────────
+            const body = req.body as any;
+            title = body.title?.trim() || '';
+            description = body.description?.trim() || '';
+            type = body.type?.trim() || '';
+
+            if (!title) return reply.status(400).send({ error: 'Title is required' });
+
+            if (type === 'TEXT' && body.content?.trim()) {
+                contentOrUrl = body.content.trim();
+                isUrl = false;
+                hasContentChange = true;
+            } else if (type === 'LINK' && body.url?.trim()) {
+                contentOrUrl = body.url.trim();
+                isUrl = true;
+                hasContentChange = true;
+            }
+            // If neither content nor URL provided — it's a metadata-only edit
+        }
+
+        // ── Content changed: Atomic Swap (create new vectors → async delete old) ──
+        if (hasContentChange) {
+            const newResource = await GtwyService.replaceResourceFast(
+                caseObj.collection_id,
+                resourceId,
+                title,
+                contentOrUrl,
+                isUrl,
+                description || title
+            );
+            return reply.send({ success: true, resource: newResource, replaced: true });
+        }
+
+        // ── Metadata only (title / description): Fast PUT — no re-indexing needed ──
+        const updated = await GtwyService.updateResource(resourceId, title, description || title);
+        return reply.send({ success: true, resource: updated, replaced: false });
+
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
     }
