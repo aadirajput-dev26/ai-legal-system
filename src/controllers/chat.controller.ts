@@ -80,7 +80,9 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         try {
             const toolRepo = new ToolRepository(pool);
             const toolsList = await toolRepo.findByCaseId(caseId);
-            toolsSummary = toolsList.map((t: any) => `${t.title}: ${t.description || 'No description'}`).join('\n');
+            if (toolsList && toolsList.length > 0) {
+                toolsSummary = JSON.stringify(toolsList);
+            }
         } catch (err) {
             console.error("Failed to fetch tools for variables context:", err);
         }
@@ -91,7 +93,14 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
             try {
                 const resData = await GtwyService.getResourcesByCase(caseRecord.collection_id);
                 const resources = resData?.resources || [];
-                resourcesSummary = resources.map((r: any) => `${r.title}: ${r.description || 'No description'}`).join('\n');
+                if (resources.length > 0) {
+                    const formattedResources = resources.map((r: any) => ({
+                        resource_id: r._id || r.id || r.resource_id,
+                        name: r.title || r.name || 'Untitled',
+                        description: r.description || 'No description'
+                    }));
+                    resourcesSummary = JSON.stringify(formattedResources);
+                }
             } catch (err) {
                 console.error("Failed to fetch resources for variables context:", err);
             }
