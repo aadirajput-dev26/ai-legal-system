@@ -1,6 +1,7 @@
 import { App } from "./app.js";
 import { config } from "./lib/config.js";
 import { startHearingWorker } from "./workers/hearing.worker.js";
+import { startLegalUpdateWorker } from "./workers/legal-update.worker.js";
 
 async function main(): Promise<void>{
     const app = App();
@@ -11,6 +12,7 @@ async function main(): Promise<void>{
 
     // Start background workers after server is ready
     startHearingWorker();
+    startLegalUpdateWorker();
 }
 
 main().catch((err) => {
