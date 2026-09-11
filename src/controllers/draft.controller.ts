@@ -12,13 +12,16 @@ function extractAccessToken(req: FastifyRequest): string {
     return authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
 }
 
-async function pipeStreamToReply(gtwyStream: Response, reply: FastifyReply) {
+async function pipeStreamToReply(gtwyStream: Response, reply: FastifyReply, initialChunk?: string) {
     reply.header('Content-Type', 'text/event-stream');
     reply.header('Cache-Control', 'no-cache');
     reply.header('Connection', 'keep-alive');
     reply.header('X-Accel-Buffering', 'no');
 
     async function* streamGenerator() {
+        if (initialChunk) {
+            yield Buffer.from(initialChunk);
+        }
         const reader = gtwyStream.body!.getReader();
         try {
             while (true) {
@@ -123,10 +126,12 @@ export async function generateDraft(req: FastifyRequest, reply: FastifyReply) {
             draft.id
         );
 
-        // Include draftId in headers so client knows which draft was created
+        // Include draftId in headers and expose for CORS
         reply.header('X-Draft-Id', draft.id);
+        reply.header('Access-Control-Expose-Headers', 'X-Draft-Id');
 
-        return pipeStreamToReply(gtwyStream, reply);
+        const initialChunk = `data: {"event":"draft_created","draftId":"${draft.id}"}\n\n`;
+        return pipeStreamToReply(gtwyStream, reply, initialChunk);
     } catch (err: any) {
         return reply.code(500).send({ success: false, error: err.message });
     }
@@ -139,12 +144,27 @@ export async function generateDraft(req: FastifyRequest, reply: FastifyReply) {
  */
 export async function refineDraft(req: FastifyRequest, reply: FastifyReply) {
     try {
-        const { id: caseId, draftId } = req.params as { id: string; draftId: string };
+        const { id: caseId, draftId } = req.params as { id: string; draftId?: string };
         const body = req.body as {
             prompt: string;
             selectedText?: string;
             currentContent: string;
         };
+
+        if (!draftId || draftId.trim() === '' || draftId === 'undefined') {
+            return reply.code(400).send({
+                success: false,
+                error: 'draftId parameter is required in URL path: /cases/:id/drafts/:draftId/refine'
+            });
+        }
+
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(draftId)) {
+            return reply.code(400).send({
+                success: false,
+                error: `Invalid draftId: "${draftId}" is not a valid UUID`
+            });
+        }
 
         if (!body?.prompt || !body?.currentContent) {
             return reply.code(400).send({ success: false, error: 'prompt and currentContent are required' });
