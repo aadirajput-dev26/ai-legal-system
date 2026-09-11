@@ -15,6 +15,7 @@ const env = z.object({
     VIASOCKET_ORG_ID         : z.string().optional(),
     VIASOCKET_PROJECT_ID     : z.string().optional(),
     PAUTHKEY:z.string().min(1),
+    GTWY_DRAFT_AGENT_ID      : z.string().default('6aa3f0a03e5db27e9a0661e4'),
 });
 
 export const config = env.parse(process.env);

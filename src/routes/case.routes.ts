@@ -8,6 +8,7 @@ import * as chatController from '../controllers/chat.controller.js';
 import * as hearingController from '../controllers/hearing.controller.js';
 import * as toolController from '../controllers/tool.controller.js';
 import * as taskController from '../controllers/task.controller.js';
+import * as draftController from '../controllers/draft.controller.js';
 
 export async function caseRoutes(app: FastifyInstance) {
     // ── Cases within an Org ────────────────────────────────────────
@@ -22,6 +23,10 @@ export async function caseRoutes(app: FastifyInstance) {
     app.get('/organisations/:id/documents', {
         preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR', 'VIEWER'])]
     }, documentController.listOrgDocuments);
+
+    app.get('/organisations/:id/drafts', {
+        preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR', 'VIEWER'])]
+    }, draftController.listOrgDrafts);
 
     app.post('/organisations/:id/cases', {
         preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR'])]
@@ -70,4 +75,13 @@ export async function caseRoutes(app: FastifyInstance) {
     app.post<{ Params: { id: string } }>('/cases/:id/tools/import', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, toolController.importTool);
     app.get<{ Params: { id: string; orgId: string } }>('/organisations/:orgId/cases/:id/tools/importable', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, toolController.listImportableTools);
     app.get<{ Params: { id: string } }>('/cases/:id/tools/token', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, toolController.getViasocketToken);
+
+    // ── AI Drafts ──────────────────────────────────────────────────
+    app.get<{ Params: { id: string } }>('/cases/:id/drafts', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, draftController.listDrafts);
+    app.get<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, draftController.getDraft);
+    app.post<{ Params: { id: string } }>('/cases/:id/drafts/generate', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, draftController.generateDraft);
+    app.post<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId/refine', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, draftController.refineDraft);
+    app.patch<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, draftController.updateDraft);
+    app.delete<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId', { preHandler: [authenticate, requireCaseRole(['ADMIN'])] }, draftController.deleteDraft);
+    app.get<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId/versions', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, draftController.getDraftVersions);
 }

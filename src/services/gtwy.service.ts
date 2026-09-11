@@ -1,6 +1,16 @@
 import { config } from '../lib/config.js';
 
+const resourcesCache = new Map<string, { data: any; expiresAt: number }>();
+
 export class GtwyService {
+    static invalidateResourcesCache(collectionId?: string) {
+        if (collectionId) {
+            resourcesCache.delete(collectionId);
+        } else {
+            resourcesCache.clear();
+        }
+    }
+
     static async uploadPdf(fileBuffer: Buffer, filename: string): Promise<string> {
         const formData = new FormData();
         formData.append('file', new Blob([new Uint8Array(fileBuffer)], { type: 'application/pdf' }), filename);
@@ -64,6 +74,7 @@ export class GtwyService {
             throw new Error(`Failed to create resource: ${response.status} ${errorText}`);
         }
 
+        this.invalidateResourcesCache(collectionId);
         return response.json();
     }
 
@@ -88,6 +99,7 @@ export class GtwyService {
             throw new Error(`Failed to update resource: ${response.status} ${errorText}`);
         }
 
+        this.invalidateResourcesCache();
         return response.json();
     }
 
@@ -114,6 +126,7 @@ export class GtwyService {
             console.error(`[Background Cleanup] Failed to delete old resource ${oldResourceId}:`, err);
         });
 
+        this.invalidateResourcesCache(collectionId);
         return newResource;
     }
 
@@ -131,6 +144,7 @@ export class GtwyService {
             throw new Error(`Failed to delete resource: ${response.status} ${errorText}`);
         }
 
+        this.invalidateResourcesCache();
         return response.json();
     }
 
@@ -151,7 +165,14 @@ export class GtwyService {
         return response.json();
     }
 
-    static async getResourcesByCase(collectionId: string) {
+    static async getResourcesByCase(collectionId: string, useCache: boolean = true) {
+        if (useCache) {
+            const cached = resourcesCache.get(collectionId);
+            if (cached && cached.expiresAt > Date.now()) {
+                return cached.data;
+            }
+        }
+
         const url = `${config.HIPPOCAMPUS_HOST_URL}/collection/${collectionId}/resources`;
         
         console.log(`\n--- INTERNAL API CURL ---`);
@@ -175,7 +196,12 @@ export class GtwyService {
                     throw new Error(`Failed to get resources: ${response.status} ${errorText}`);
                 }
 
-                return await response.json();
+                const data = await response.json();
+                resourcesCache.set(collectionId, {
+                    data,
+                    expiresAt: Date.now() + 60_000 // 60 seconds TTL cache
+                });
+                return data;
             } catch (err: any) {
                 retries--;
                 if (retries === 0 || !err.message.includes('fetch failed')) {
