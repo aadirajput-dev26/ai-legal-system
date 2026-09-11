@@ -28,9 +28,11 @@ export async function caseRoutes(app: FastifyInstance) {
     }, caseController.createCase);
 
     // ── Case CRUD ──────────────────────────────────────────────────
-    app.get('/cases/:id',    { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseController.getCase);
-    app.patch('/cases/:id',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, caseController.updateCase);
-    app.delete('/cases/:id', { preHandler: [authenticate, requireCaseRole(['ADMIN'])] }, caseController.deleteCase);
+    app.get('/cases/:id',         { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseController.getCase);
+    app.get('/cases/:id/context', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseController.getCaseContext);
+    app.get('/case/:id/context',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseController.getCaseContext);
+    app.patch('/cases/:id',       { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, caseController.updateCase);
+    app.delete('/cases/:id',      { preHandler: [authenticate, requireCaseRole(['ADMIN'])] }, caseController.deleteCase);
 
     // ── Case Member Management ─────────────────────────────────────
     app.get('/cases/:id/members',            { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseMemberController.listCaseMembers);

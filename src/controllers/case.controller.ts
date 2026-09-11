@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { CaseRepository } from '../repositories/case.repository.js';
 import { createCollection, deleteCollection } from '../lib/hippocampus.js';
+import { CaseContextService } from '../services/case-context.service.js';
 
 // ─────────────────────────────────────────────
 // GET /api/v1/organisations/:id/cases
@@ -173,3 +174,27 @@ export async function getOrgCalendar(req: FastifyRequest, reply: FastifyReply) {
 
     return reply.code(200).send({ success: true, data: calendarData });
 }
+
+// ─────────────────────────────────────────────
+// GET /api/v1/cases/:id/context
+// GET /api/v1/case/:id/context
+// Returns rich structured context and AI template variables
+// ─────────────────────────────────────────────
+export async function getCaseContext(req: FastifyRequest, reply: FastifyReply) {
+    const { id: caseId } = req.params as { id: string };
+
+    const authHeader = req.headers.authorization || '';
+    const accessToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
+
+    const context = await CaseContextService.getFullCaseContext(caseId, accessToken);
+
+    if (!context) {
+        return reply.code(404).send({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'Case not found.' },
+        });
+    }
+
+    return reply.code(200).send({ success: true, data: context });
+}
+
