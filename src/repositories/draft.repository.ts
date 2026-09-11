@@ -71,11 +71,10 @@ export class DraftRepository {
                     c.title as case_title, c.case_number, c.court
              FROM drafts d
              JOIN cases c ON c.id = d.case_id
+             JOIN organisation_members om ON c.organisation_id = om.organisation_id AND om.user_id = $2
+             LEFT JOIN case_members cm ON cm.case_id = c.id AND cm.user_id = $2
              WHERE c.organisation_id = $1
-               AND (
-                 EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = c.id AND cm.user_id = $2)
-                 OR EXISTS (SELECT 1 FROM organisation_members om WHERE om.organisation_id = $1 AND om.user_id = $2 AND om.role IN ('OWNER', 'ADMIN'))
-               )
+               AND (om.role = 'ADMIN' OR cm.user_id IS NOT NULL)
              ORDER BY d.updated_at DESC`,
             [orgId, userId]
         );
