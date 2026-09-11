@@ -36,6 +36,19 @@ async function pipeStreamToReply(gtwyStream: Response, reply: FastifyReply) {
 
 // ── Controllers ───────────────────────────────────────────────────
 
+/** GET /organisations/:id/drafts */
+export async function listOrgDrafts(req: FastifyRequest, reply: FastifyReply) {
+    try {
+        const { id: orgId } = req.params as { id: string };
+        const user = req.user as { userId: string };
+
+        const drafts = await DraftRepository.listByOrgAndUser(orgId, user.userId);
+        return reply.code(200).send({ success: true, data: drafts });
+    } catch (err: any) {
+        return reply.code(500).send({ success: false, error: err.message });
+    }
+}
+
 /** GET /api/v1/cases/:id/drafts */
 export async function listDrafts(req: FastifyRequest, reply: FastifyReply) {
     try {

@@ -29,6 +29,9 @@ export interface DraftRow {
     created_by: string | null;
     created_at: string;
     updated_at: string;
+    case_title?: string;
+    case_number?: string | null;
+    court?: string | null;
 }
 
 export interface DraftVersionRow {
@@ -61,6 +64,24 @@ export interface UpdateDraftParams {
 // ── Repository ────────────────────────────────────────────────────
 
 export class DraftRepository {
+    static async listByOrgAndUser(orgId: string, userId: string): Promise<DraftRow[]> {
+        const result = await pool.query<DraftRow>(
+            `SELECT d.id, d.case_id, d.title, d.description, d.draft_type, d.status, d.instructions,
+                    d.current_content, d.created_by, d.created_at, d.updated_at,
+                    c.title as case_title, c.case_number, c.court
+             FROM drafts d
+             JOIN cases c ON c.id = d.case_id
+             WHERE c.organisation_id = $1
+               AND (
+                 EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = c.id AND cm.user_id = $2)
+                 OR EXISTS (SELECT 1 FROM organisation_members om WHERE om.organisation_id = $1 AND om.user_id = $2 AND om.role IN ('OWNER', 'ADMIN'))
+               )
+             ORDER BY d.updated_at DESC`,
+            [orgId, userId]
+        );
+        return result.rows;
+    }
+
     static async listByCase(caseId: string): Promise<DraftRow[]> {
         const result = await pool.query<DraftRow>(
             `SELECT id, case_id, title, description, draft_type, status, instructions,

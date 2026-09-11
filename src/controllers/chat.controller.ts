@@ -64,30 +64,28 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         
         if (!body?.message) return reply.status(400).send({ error: 'Message is required' });
 
-        const chat = await ChatThreadRepository.getById(chatId);
-        if (!chat) return reply.status(404).send({ error: 'Chat not found' });
-
-        // Fetch the case to get context
-        const caseRecord = await CaseRepository.findById(caseId);
-        if (!caseRecord) return reply.status(404).send({ error: 'Case not found' });
-
         // Extract token
         const authHeader = req.headers.authorization || '';
         const accessToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
 
-        // Fetch tools for case context
-        let toolsSummary = '';
-        try {
-            const toolRepo = new ToolRepository(pool);
-            const toolsList = await toolRepo.findByCaseId(caseId);
-            if (toolsList && toolsList.length > 0) {
-                toolsSummary = JSON.stringify(toolsList);
-            }
-        } catch (err) {
-            console.error("Failed to fetch tools for variables context:", err);
-        }
+        const toolRepo = new ToolRepository(pool);
 
-        // Fetch resources/documents for case context
+        // Run chat verification, case lookup, and tool fetching in parallel
+        const [chat, caseRecord, toolsList] = await Promise.all([
+            ChatThreadRepository.getById(chatId),
+            CaseRepository.findById(caseId),
+            toolRepo.findByCaseId(caseId).catch(err => {
+                console.error("Failed to fetch tools for variables context:", err);
+                return [];
+            })
+        ]);
+
+        if (!chat) return reply.status(404).send({ error: 'Chat not found' });
+        if (!caseRecord) return reply.status(404).send({ error: 'Case not found' });
+
+        const toolsSummary = toolsList && toolsList.length > 0 ? JSON.stringify(toolsList) : '';
+
+        // Fetch resources/documents for case context (cached where possible)
         let resourcesSummary = '';
         if (caseRecord.collection_id) {
             try {

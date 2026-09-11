@@ -24,6 +24,10 @@ export async function caseRoutes(app: FastifyInstance) {
         preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR', 'VIEWER'])]
     }, documentController.listOrgDocuments);
 
+    app.get('/organisations/:id/drafts', {
+        preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR', 'VIEWER'])]
+    }, draftController.listOrgDrafts);
+
     app.post('/organisations/:id/cases', {
         preHandler: [authenticate, requireOrgRole(['ADMIN', 'EDITOR'])]
     }, caseController.createCase);

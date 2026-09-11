@@ -1,13 +1,15 @@
 import { GtwyService } from './gtwy.service.js';
-import { DraftContextService } from './draft-context.service.js';
-import { DraftRepository } from '../repositories/draft.repository.js';
 import { config } from '../lib/config.js';
 import type { DraftType } from '../repositories/draft.repository.js';
 
 export class DraftService {
+    private static getAgentId(): string {
+        return config.GTWY_DRAFT_AGENT_ID || '6aa3f0a03e5db27e9a0661e4';
+    }
+
     /**
-     * Aggregates case context and streams an AI-generated draft from GTWY.
-     * Returns the raw streaming Response for the controller to pipe to the client.
+     * Streams an AI-generated draft from GTWY agent 6aa3f0a03e5db27e9a0661e4.
+     * Passes caseId and draft variables.
      */
     static async generateDraftStream(
         caseId: string,
@@ -16,54 +18,22 @@ export class DraftService {
         accessToken: string,
         threadId: string
     ): Promise<Response> {
-        // 1. Build full case context
-        const ctx = await DraftContextService.buildContext(caseId);
-
-        // 2. Convert to GTWY variables
-        const variables = DraftContextService.toVariables(ctx, draftType, draftInstructions, accessToken);
-
-        // 3. Build the AI prompt message
         const draftTypeLabel = draftType.replace(/_/g, ' ').toLowerCase()
             .replace(/\b\w/g, c => c.toUpperCase());
 
-        const userMessage = `You are an expert Indian legal drafter. Generate a professional ${draftTypeLabel} for the following case.
+        const variables: Record<string, string> = {
+            caseId,
+            accessToken,
+            draftType: draftTypeLabel,
+            draftInstructions: draftInstructions || '',
+        };
 
-=== CASE CONTEXT ===
-Case Name: ${ctx.caseName}
-Case Number: ${ctx.caseNumber || 'N/A'}
-Court: ${ctx.court || 'N/A'}
-Case Type: ${ctx.caseType || 'N/A'}
-Stage: ${ctx.stage || 'N/A'}
-Judge: ${ctx.judge || 'N/A'}
-Filing Date: ${ctx.filingDate || 'N/A'}
+        const userMessage = draftInstructions && draftInstructions.trim()
+            ? `Generate a professional ${draftTypeLabel} for this case. Specific instructions: ${draftInstructions}`
+            : `Generate a professional ${draftTypeLabel} for this case. Follow standard Indian legal notice/draft formatting, include all legal grounds, relief sought, demand timeline, reserved rights, and placeholder fields in brackets (e.g. [Date], [Accused Name], [Deceased Name], [Address], [Location], [Age], [Beneficiary details], [Court], etc.) where appropriate particulars are to be filled.`;
 
-Client / Petitioner: ${ctx.clientName || 'Client'}
-Opposite Party / Respondent: ${ctx.opposingParty || 'Opposite Party'}
-
-Case Description:
-${ctx.description || 'Not provided'}
-
-Case Instructions / Background:
-${ctx.instructions || 'None'}
-
-=== HEARING HISTORY ===
-${ctx.hearingsSummary}
-
-=== TASKS & NOTES ===
-${ctx.tasksSummary}
-
-=== UPLOADED DOCUMENTS ===
-${ctx.documentsSummary}
-
-=== DRAFT INSTRUCTIONS ===
-Draft Type: ${draftTypeLabel}
-Special Instructions: ${draftInstructions || 'None — generate a standard, complete draft.'}
-
-Generate the complete ${draftTypeLabel} now. Follow proper Indian legal formatting, include all legally required sections, cite relevant Indian statutes and provisions where applicable. Output the full document in Markdown format.`;
-
-        // 4. Stream the generation
         return GtwyService.sendMessageStream(
-            config.GTWY_UNIVERSAL_AGENT_ID,
+            this.getAgentId(),
             threadId,
             userMessage,
             variables
@@ -71,8 +41,8 @@ Generate the complete ${draftTypeLabel} now. Follow proper Indian legal formatti
     }
 
     /**
-     * Streams an AI refinement of a specific section or the full draft.
-     * The lawyer provides a prompt describing what change to make.
+     * Streams an AI refinement or conversational update for a draft document.
+     * Uses GTWY agent 6aa3f0a03e5db27e9a0661e4 with caseId, currentDocument, and user instruction.
      */
     static async refineDraftStream(
         caseId: string,
@@ -82,38 +52,39 @@ Generate the complete ${draftTypeLabel} now. Follow proper Indian legal formatti
         accessToken: string,
         threadId: string
     ): Promise<Response> {
-        const ctx = await DraftContextService.buildContext(caseId);
-        const variables = DraftContextService.toVariables(ctx, 'OTHER', refinementPrompt, accessToken);
+        const variables: Record<string, string> = {
+            caseId,
+            accessToken,
+            instruction: refinementPrompt,
+            currentDocument: currentContent,
+        };
 
         let userMessage: string;
 
-        if (selectedText) {
-            userMessage = `You are an expert Indian legal drafter. The lawyer has selected a specific section of a legal document and wants you to refine it.
-
-=== FULL DRAFT (for context) ===
-${currentContent}
-
-=== SELECTED TEXT TO REFINE ===
+        if (selectedText && selectedText.trim()) {
+            userMessage = `The lawyer has selected the following text in the legal draft to refine:
+"""
 ${selectedText}
+"""
 
-=== REFINEMENT INSTRUCTION ===
-${refinementPrompt}
+Instruction: ${refinementPrompt}
 
-Please output ONLY the refined replacement text for the selected section. Do not include the rest of the document — output only what should replace the selected text.`;
-        } else {
-            userMessage = `You are an expert Indian legal drafter. The lawyer wants to refine the following legal document.
-
-=== CURRENT DRAFT ===
+Full document for context:
 ${currentContent}
 
-=== REFINEMENT INSTRUCTION ===
+Output the refined replacement text for the selected section.`;
+        } else {
+            userMessage = `Current Draft Document:
+${currentContent}
+
+Lawyer's Instruction:
 ${refinementPrompt}
 
-Please output the COMPLETE refined document in Markdown format, incorporating the requested changes while preserving all other sections.`;
+Please update the document according to the instruction while maintaining legal precision, formal formatting, and consistent placeholder fields. Output the revised document.`;
         }
 
         return GtwyService.sendMessageStream(
-            config.GTWY_UNIVERSAL_AGENT_ID,
+            this.getAgentId(),
             threadId,
             userMessage,
             variables
