@@ -47,6 +47,7 @@ export const App = () => {
     app.register(authRoutes,         { prefix: '/api/v1/auth' });
     app.register(organisationRoutes, { prefix: '/api/v1/organisations' });
     app.register(caseRoutes,         { prefix: '/api/v1' });
+    app.register(caseRoutes,         { prefix: '' });
     app.register(notificationRoutes, { prefix: '/api/v1' });
     app.register(legalUpdateRoutes,  { prefix: '/api/v1' });
 
