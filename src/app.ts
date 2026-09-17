@@ -10,6 +10,7 @@ import { organisationRoutes } from './routes/organisation.routes.js';
 import { caseRoutes } from './routes/case.routes.js';
 import { notificationRoutes } from './routes/notification.routes.js';
 import { legalUpdateRoutes } from './routes/legal-update.routes.js';
+import { billingRoutes } from './routes/billing.routes.js';
 
 export const App = () => {
     const app = Fastify({
@@ -38,6 +39,24 @@ export const App = () => {
 
     app.register(postgres, { connectionString: config.DATABASE_URL });
 
+    // ── Raw body for Razorpay webhooks ─────────────────────────────
+    // The webhook HMAC is computed over the EXACT bytes Razorpay sent.
+    // JSON.parse followed by JSON.stringify changes them and the signature
+    // would never match, so the raw string is kept alongside the parsed body.
+    app.addContentTypeParser(
+        'application/json',
+        { parseAs: 'string' },
+        (req: any, body: string, done: any) => {
+            req.rawBody = body;
+            try {
+                done(null, body && body.length ? JSON.parse(body) : {});
+            } catch (err: any) {
+                err.statusCode = 400;
+                done(err, undefined);
+            }
+        },
+    );
+
     // ── Health Check ───────────────────────────────────────────────
     app.get('/', () => ({
         success: true,
@@ -52,6 +71,7 @@ export const App = () => {
     app.register(caseRoutes,         { prefix: '' });
     app.register(notificationRoutes, { prefix: '/api/v1' });
     app.register(legalUpdateRoutes,  { prefix: '/api/v1' });
+    app.register(billingRoutes,      { prefix: '/api/v1' });
 
     return app;
 };
