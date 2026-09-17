@@ -1,4 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { UsageService, type MeterContext } from '../services/usage.service.js';
+import pool from '../lib/db.js';
 import { Readable } from 'stream';
 import { DraftRepository } from '../repositories/draft.repository.js';
 import { DraftService } from '../services/draft.service.js';
@@ -12,7 +14,12 @@ function extractAccessToken(req: FastifyRequest): string {
     return authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
 }
 
-async function pipeStreamToReply(gtwyStream: Response, reply: FastifyReply, initialChunk?: string) {
+async function pipeStreamToReply(
+    gtwyStream: Response,
+    reply: FastifyReply,
+    initialChunk?: string,
+    meter?: MeterContext,
+) {
     reply.header('Content-Type', 'text/event-stream');
     reply.header('Cache-Control', 'no-cache');
     reply.header('Connection', 'keep-alive');
@@ -21,6 +28,12 @@ async function pipeStreamToReply(gtwyStream: Response, reply: FastifyReply, init
     async function* streamGenerator() {
         if (initialChunk) {
             yield Buffer.from(initialChunk);
+        }
+        // With a meter context the stream is measured; without one it is a
+        // plain passthrough, so this helper stays usable either way.
+        if (meter) {
+            yield* UsageService.meterStream(gtwyStream, meter);
+            return;
         }
         const reader = gtwyStream.body!.getReader();
         try {
@@ -35,6 +48,12 @@ async function pipeStreamToReply(gtwyStream: Response, reply: FastifyReply, init
     }
 
     return reply.send(Readable.from(streamGenerator()));
+}
+
+/** The organisation that owns a case — usage is always attributed to an org. */
+async function orgIdForCase(caseId: string): Promise<string | null> {
+    const r = await pool.query('SELECT organisation_id FROM cases WHERE id = $1', [caseId]);
+    return r.rows[0]?.organisation_id ?? null;
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -152,7 +171,13 @@ export async function generateDraft(req: FastifyRequest, reply: FastifyReply) {
         reply.header('Access-Control-Expose-Headers', 'X-Draft-Id');
 
         const initialChunk = `data: {"event":"draft_created","draftId":"${draft.id}"}\n\n`;
-        return pipeStreamToReply(gtwyStream, reply, initialChunk);
+        return pipeStreamToReply(gtwyStream, reply, initialChunk, {
+            organisationId: await orgIdForCase(caseId),
+            userId: user.userId,
+            caseId,
+            feature: 'DRAFT_GENERATE',
+            resourceId: draft.id,
+        });
     } catch (err: any) {
         return reply.code(500).send({ success: false, error: err.message });
     }
@@ -205,7 +230,13 @@ export async function refineDraft(req: FastifyRequest, reply: FastifyReply) {
             `${draftId}-refine-${Date.now()}`
         );
 
-        return pipeStreamToReply(gtwyStream, reply);
+        return pipeStreamToReply(gtwyStream, reply, undefined, {
+            organisationId: await orgIdForCase(caseId),
+            userId: (req.user as { userId: string }).userId,
+            caseId,
+            feature: 'DRAFT_REFINE',
+            resourceId: draftId!,
+        });
     } catch (err: any) {
         return reply.code(500).send({ success: false, error: err.message });
     }
