@@ -19,12 +19,15 @@ CREATE TABLE IF NOT EXISTS plans (
     razorpay_plan_id    TEXT UNIQUE,
     price_micro         BIGINT NOT NULL,              -- ₹1,799 → 1799000000
     currency            CHAR(3) NOT NULL DEFAULT 'INR',
+    -- TODO(intervals): only monthly is implemented; razorpay.service hardcodes it.
     interval            TEXT NOT NULL DEFAULT 'monthly',
     included_credits    BIGINT NOT NULL,
     seat_limit          INTEGER,
     rollover_policy     TEXT NOT NULL DEFAULT 'EXPIRE',   -- EXPIRE | FULL | CAPPED
     rollover_cap_credits BIGINT,
+    -- TODO(overage): checkCredits currently always blocks; it does not read this yet.
     overage_policy      TEXT NOT NULL DEFAULT 'TOPUP',    -- BLOCK | TOPUP | ALLOW
+    -- TODO(entitlements): per-plan feature flags. Not read yet.
     features            JSONB NOT NULL DEFAULT '{}',
     sort_order          INTEGER NOT NULL DEFAULT 0,
     active              BOOLEAN NOT NULL DEFAULT true,
@@ -48,12 +51,14 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     organisation_id          UUID NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
     plan_id                  UUID NOT NULL REFERENCES plans(id),
     razorpay_subscription_id TEXT UNIQUE,
+    -- TODO(customers): set once we create Razorpay customers explicitly.
     razorpay_customer_id     TEXT,
     -- Mirrors Razorpay verbatim. NEVER set from the frontend.
     status                   TEXT NOT NULL DEFAULT 'created',
     current_period_start     TIMESTAMPTZ,
     current_period_end       TIMESTAMPTZ,
     cancel_at_period_end     BOOLEAN NOT NULL DEFAULT false,
+    -- TODO(auto-topup): reserved for automatic top-up. Not read by any code yet.
     auto_topup_enabled       BOOLEAN NOT NULL DEFAULT false,
     auto_topup_pack_id       UUID REFERENCES credit_packs(id),
     created_by               UUID REFERENCES users(id),
@@ -62,8 +67,11 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 );
 
 -- One live subscription per organisation.
+-- 'paused' counts as live: Razorpay pauses during a dispute and resumes
+-- automatically. Omitting it would let a second subscription be created
+-- alongside a paused one, and both would then charge.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_sub_org_live ON subscriptions(organisation_id)
-    WHERE status IN ('created','authenticated','active','pending','halted');
+    WHERE status IN ('created','authenticated','active','pending','halted','paused');
 
 -- ── Billing periods ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS billing_periods (
@@ -133,34 +141,15 @@ CREATE TABLE IF NOT EXISTS usage_events (
 -- A retried request that the Gateway did not re-run cannot be charged twice.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_usage_gateway_msg
     ON usage_events(gateway_message_id) WHERE gateway_message_id IS NOT NULL;
+-- KEEP. Not redundant with ix_usage_feature: `feature` sits between the two
+-- columns there, so that index cannot satisfy ORDER BY created_at DESC.
+-- Measured on 200k rows: with this index 0.2ms / 5 buffers; without it Postgres
+-- falls back to a parallel seq scan + sort at 17.8ms / 1839 buffers.
 CREATE INDEX IF NOT EXISTS ix_usage_org_time   ON usage_events(organisation_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS ix_usage_feature    ON usage_events(organisation_id, feature, created_at DESC);
 CREATE INDEX IF NOT EXISTS ix_usage_case       ON usage_events(case_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS ix_usage_user       ON usage_events(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS ix_usage_period     ON usage_events(billing_period_id);
-
--- ── Credit ledger — the balance IS this table ────────────────────────
-CREATE TABLE IF NOT EXISTS credit_ledger (
-    id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organisation_id      UUID NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
-    billing_period_id    UUID REFERENCES billing_periods(id) ON DELETE SET NULL,
-    entry_type           TEXT NOT NULL,
-        -- ALLOCATION | CONSUMPTION | TOPUP | REFUND | ROLLOVER | EXPIRY | ADJUSTMENT
-    delta_credits_micro  BIGINT NOT NULL,        -- signed: consumption is negative
-    balance_after_micro  BIGINT NOT NULL,
-    usage_event_id       UUID REFERENCES usage_events(id) ON DELETE SET NULL,
-    payment_id           UUID,
-    idempotency_key      TEXT,
-    reason               TEXT,
-    created_by           UUID REFERENCES users(id) ON DELETE SET NULL,
-    created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE UNIQUE INDEX IF NOT EXISTS ux_ledger_idem
-    ON credit_ledger(idempotency_key) WHERE idempotency_key IS NOT NULL;
--- One consumption entry per usage event, ever.
-CREATE UNIQUE INDEX IF NOT EXISTS ux_ledger_usage
-    ON credit_ledger(usage_event_id) WHERE usage_event_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS ix_ledger_org_time ON credit_ledger(organisation_id, created_at DESC);
 
 -- ── Payments ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS payments (
@@ -183,7 +172,36 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ix_payments_org ON payments(organisation_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS ix_payments_order ON payments(razorpay_order_id);
+-- UNIQUE: applyTopUpPayment() looks this up and uses rows[0]. Two rows sharing an
+-- order id would silently credit the wrong payment.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_payments_order ON payments(razorpay_order_id)
+    WHERE razorpay_order_id IS NOT NULL;
+
+-- ── Credit ledger — the balance IS this table ────────────────────────
+CREATE TABLE IF NOT EXISTS credit_ledger (
+    id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organisation_id      UUID NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+    billing_period_id    UUID REFERENCES billing_periods(id) ON DELETE SET NULL,
+    entry_type           TEXT NOT NULL,
+        -- ALLOCATION | CONSUMPTION | TOPUP | REFUND | ROLLOVER | EXPIRY | ADJUSTMENT
+    delta_credits_micro  BIGINT NOT NULL,        -- signed: consumption is negative
+    balance_after_micro  BIGINT NOT NULL,
+    usage_event_id       UUID REFERENCES usage_events(id) ON DELETE SET NULL,
+    -- FK so the audit trail survives an organisation delete cascading through
+    -- payments. SET NULL rather than CASCADE: the ledger entry is the record of
+    -- what happened and must never disappear.
+    payment_id           UUID REFERENCES payments(id) ON DELETE SET NULL,
+    idempotency_key      TEXT,
+    reason               TEXT,
+    created_by           UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_ledger_idem
+    ON credit_ledger(idempotency_key) WHERE idempotency_key IS NOT NULL;
+-- One consumption entry per usage event, ever.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_ledger_usage
+    ON credit_ledger(usage_event_id) WHERE usage_event_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_ledger_org_time ON credit_ledger(organisation_id, created_at DESC);
 
 -- ── Webhook inbox — insert first, process second ─────────────────────
 CREATE TABLE IF NOT EXISTS webhook_events (
@@ -193,6 +211,12 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     event_type      TEXT NOT NULL,
     payload         JSONB NOT NULL,
     signature_valid BOOLEAN NOT NULL DEFAULT false,
+    -- PENDING | PROCESSING | DONE | FAILED
+    -- Without this there is no way to tell "inserted, then the process was killed"
+    -- from "successfully processed". A retry would be deduplicated away and the
+    -- customer's payment would be lost. Only DONE suppresses a retry.
+    status          TEXT NOT NULL DEFAULT 'PENDING',
+    attempts        INTEGER NOT NULL DEFAULT 0,
     processed_at    TIMESTAMPTZ,
     error           TEXT,
     received_at     TIMESTAMPTZ NOT NULL DEFAULT now()

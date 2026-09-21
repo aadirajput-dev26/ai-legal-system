@@ -39,15 +39,20 @@ export const App = () => {
 
     app.register(postgres, { connectionString: config.DATABASE_URL });
 
-    // ── Raw body for Razorpay webhooks ─────────────────────────────
-    // The webhook HMAC is computed over the EXACT bytes Razorpay sent.
-    // JSON.parse followed by JSON.stringify changes them and the signature
-    // would never match, so the raw string is kept alongside the parsed body.
+    // ── Raw body, kept ONLY for the Razorpay webhook ───────────────
+    // The webhook HMAC is computed over the EXACT bytes Razorpay sent, so
+    // JSON.parse + re-stringify would break it. Fastify content-type parsers
+    // are app-wide, so this one runs for every JSON request — but it retains
+    // the raw string only for the webhook path. Every other route parses as
+    // before and holds no extra copy of its body.
+    const RAW_BODY_PATHS = ['/webhooks/razorpay'];
     app.addContentTypeParser(
         'application/json',
         { parseAs: 'string' },
         (req: any, body: string, done: any) => {
-            req.rawBody = body;
+            if (RAW_BODY_PATHS.some(p => (req.url || '').startsWith(p) || (req.url || '').includes(p))) {
+                req.rawBody = body;
+            }
             try {
                 done(null, body && body.length ? JSON.parse(body) : {});
             } catch (err: any) {
