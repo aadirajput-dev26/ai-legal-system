@@ -10,6 +10,7 @@ import { organisationRoutes } from './routes/organisation.routes.js';
 import { caseRoutes } from './routes/case.routes.js';
 import { notificationRoutes } from './routes/notification.routes.js';
 import { legalUpdateRoutes } from './routes/legal-update.routes.js';
+import { billingRoutes } from './routes/billing.routes.js';
 
 export const App = () => {
     const app = Fastify({
@@ -38,6 +39,29 @@ export const App = () => {
 
     app.register(postgres, { connectionString: config.DATABASE_URL });
 
+    // ── Raw body, kept ONLY for the Razorpay webhook ───────────────
+    // The webhook HMAC is computed over the EXACT bytes Razorpay sent, so
+    // JSON.parse + re-stringify would break it. Fastify content-type parsers
+    // are app-wide, so this one runs for every JSON request — but it retains
+    // the raw string only for the webhook path. Every other route parses as
+    // before and holds no extra copy of its body.
+    const RAW_BODY_PATHS = ['/webhooks/razorpay'];
+    app.addContentTypeParser(
+        'application/json',
+        { parseAs: 'string' },
+        (req: any, body: string, done: any) => {
+            if (RAW_BODY_PATHS.some(p => (req.url || '').startsWith(p) || (req.url || '').includes(p))) {
+                req.rawBody = body;
+            }
+            try {
+                done(null, body && body.length ? JSON.parse(body) : {});
+            } catch (err: any) {
+                err.statusCode = 400;
+                done(err, undefined);
+            }
+        },
+    );
+
     // ── Health Check ───────────────────────────────────────────────
     app.get('/', () => ({
         success: true,
@@ -52,6 +76,7 @@ export const App = () => {
     app.register(caseRoutes,         { prefix: '' });
     app.register(notificationRoutes, { prefix: '/api/v1' });
     app.register(legalUpdateRoutes,  { prefix: '/api/v1' });
+    app.register(billingRoutes,      { prefix: '/api/v1' });
 
     return app;
 };

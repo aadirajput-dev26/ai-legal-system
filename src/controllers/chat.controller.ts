@@ -3,6 +3,7 @@ import { ChatThreadRepository } from '../repositories/chat-thread.repository.js'
 import { CaseRepository } from '../repositories/case.repository.js';
 import { ToolRepository } from '../repositories/tool.repository.js';
 import pool from '../lib/db.js';
+import { UsageService } from '../services/usage.service.js';
 import { GtwyService } from '../services/gtwy.service.js';
 import { AgentService } from '../services/agent.service.js';
 import { config } from '../lib/config.js';
@@ -125,24 +126,20 @@ export const sendMessage = async (req: FastifyRequest<{ Params: { id: string, ch
         reply.header('Connection', 'keep-alive');
         reply.header('X-Accel-Buffering', 'no');
 
-        // Fastify natively supports Node streams. We convert the Web Stream AsyncIterable to a Node stream.
-        async function* streamGenerator() {
-            const reader = gtwyStream.body!.getReader();
-            try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    // Fastify expects Buffer or string in streams
-                    yield Buffer.from(value);
-                }
-            } finally {
-                reader.releaseLock();
-            }
-        }
+        // Metered passthrough. UsageService forwards every byte to the lawyer
+        // FIRST and only then inspects a copy for the `done` event that carries
+        // token counts and cost. A metering failure can never cost an answer.
+        const metered = UsageService.meterStream(gtwyStream, {
+            organisationId: caseRecord.organisation_id,
+            userId: (req.user as any)?.userId ?? null,
+            caseId,
+            feature: 'AI_CHAT',
+            resourceId: chatId,
+        });
 
         // Use standard Node stream to ensure Fastify stream pipeline and CORS headers are correctly applied
         const { Readable } = await import('stream');
-        return reply.send(Readable.from(streamGenerator()));
+        return reply.send(Readable.from(metered));
     } catch (error: any) {
         return reply.status(500).send({ error: error.message });
     }

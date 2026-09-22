@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { checkCredits } from '../middlewares/checkCredits.js';
 import { authenticate } from '../middlewares/authenticate.js';
 import { requireOrgRole, requireCaseRole } from '../middlewares/rbac.js';
 import * as caseController from '../controllers/case.controller.js';
@@ -56,7 +57,7 @@ export async function caseRoutes(app: FastifyInstance) {
     app.get<{ Params: { id: string } }>('/cases/:id/chats', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, chatController.listChats);
     app.post<{ Params: { id: string } }>('/cases/:id/chats', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, chatController.createChat);
     app.get<{ Params: { id: string, chatId: string } }>('/cases/:id/chats/:chatId/history', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, chatController.getChatHistory);
-    app.post<{ Params: { id: string, chatId: string } }>('/cases/:id/chats/:chatId/message', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, chatController.sendMessage);
+    app.post<{ Params: { id: string, chatId: string } }>('/cases/:id/chats/:chatId/message', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR']), checkCredits] }, chatController.sendMessage);
 
     // ── Hearings ───────────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/hearings',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, hearingController.listHearings);
@@ -79,8 +80,8 @@ export async function caseRoutes(app: FastifyInstance) {
     // ── AI Drafts ──────────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/drafts', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, draftController.listDrafts);
     app.get<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, draftController.getDraft);
-    app.post<{ Params: { id: string } }>('/cases/:id/drafts/generate', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, draftController.generateDraft);
-    app.post<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId/refine', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, draftController.refineDraft);
+    app.post<{ Params: { id: string } }>('/cases/:id/drafts/generate', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR']), checkCredits] }, draftController.generateDraft);
+    app.post<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId/refine', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR']), checkCredits] }, draftController.refineDraft);
     app.patch<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, draftController.updateDraft);
     app.delete<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId', { preHandler: [authenticate, requireCaseRole(['ADMIN'])] }, draftController.deleteDraft);
     app.get<{ Params: { id: string; draftId: string } }>('/cases/:id/drafts/:draftId/versions', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, draftController.getDraftVersions);
