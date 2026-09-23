@@ -238,7 +238,11 @@ export class UsageService {
                 return;
             }
 
-            if (chargeable && ctx.organisationId && priced.creditsConsumedMicro > 0) {
+            // No open billing period means the organisation has never bought a plan.
+            // Record the usage — it still belongs in the analytics — but take no
+            // credits, or the balance would go negative against an allowance that
+            // was never granted, and the billing page would read "-3 of 0".
+            if (chargeable && ctx.organisationId && period && priced.creditsConsumedMicro > 0) {
                 await CreditService.consume(client, {
                     organisationId: ctx.organisationId,
                     billingPeriodId: period,

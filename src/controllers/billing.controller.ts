@@ -375,6 +375,11 @@ async function handleWebhook(eventType: string, payload: any, dedupeId: string):
         case 'subscription.paused':
         case 'subscription.resumed':
         case 'subscription.cancelled':
+        // 'expired' is terminal: the customer never authenticated before start_at.
+        // Without this the row stays at 'created'/'authenticated', which
+        // ux_sub_org_live treats as live — and that organisation could then never
+        // create another subscription.
+        case 'subscription.expired':
         case 'subscription.completed': {
             if (!subEntity) return;
             await BillingRepository.updateSubscriptionFromWebhook({
