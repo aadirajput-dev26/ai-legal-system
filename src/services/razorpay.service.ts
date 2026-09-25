@@ -52,6 +52,10 @@ export class RazorpayService {
 
     /** Create the recurring plan. Run once per plan; store the id on `plans`. */
     static createPlan(args: { amountPaise: number; name: string; description?: string }) {
+        if (!billingConfig.razorpay.configured) {
+            console.log('[Mock Razorpay] Created Plan:', args);
+            return Promise.resolve({ id: `plan_mock_${Date.now()}` });
+        }
         return call('/plans', {
             method: 'POST',
             body: JSON.stringify({
@@ -78,6 +82,10 @@ export class RazorpayService {
         notes?: Record<string, string>;
         customerNotify?: boolean;
     }) {
+        if (!billingConfig.razorpay.configured) {
+            console.log('[Mock Razorpay] Created Subscription:', args);
+            return Promise.resolve({ id: `sub_mock_${Date.now()}`, status: 'created' });
+        }
         return call('/subscriptions', {
             method: 'POST',
             body: JSON.stringify({

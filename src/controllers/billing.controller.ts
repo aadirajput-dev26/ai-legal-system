@@ -145,7 +145,9 @@ export const subscribe = async (req: FastifyRequest, reply: FastifyReply) => {
         if (!r.ok) return fail(reply, r.status, r.code, r.message, r.extra);
         const org = r.org;
         if (!org.isAdmin) return fail(reply, 403, 'FORBIDDEN', 'Only an organisation administrator can change the plan.');
-        if (!RazorpayService.configured) return fail(reply, 503, 'RAZORPAY_NOT_CONFIGURED', 'Payments are not enabled on this server yet.');
+        if (!RazorpayService.configured && process.env.NODE_ENV === 'production') {
+            return fail(reply, 503, 'RAZORPAY_NOT_CONFIGURED', 'Payments are not enabled on this server yet.');
+        }
 
         const { planCode } = (req.body as any) || {};
         const plan = await BillingRepository.findPlanByCode(planCode || 'PRO');

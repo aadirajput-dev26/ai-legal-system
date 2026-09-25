@@ -32,7 +32,7 @@ export const billingConfig = {
     minBalanceCredits: Math.round(num(process.env.BILLING_MIN_BALANCE_CREDITS, 200)),
 
     /** Turn enforcement off and keep only measurement. Phase 0 / incidents. */
-    enforcementEnabled: process.env.BILLING_ENFORCEMENT !== 'false',
+    enforcementEnabled: !['false', '"false"', '0'].includes(String(process.env.BILLING_ENFORCEMENT).trim().toLowerCase()),
 
     /** What customers see this unit called. "Tokens" or "Credits". */
     creditLabel: process.env.BILLING_CREDIT_LABEL || 'Tokens',
