@@ -29,7 +29,7 @@ const env = z.object({
     BILLING_MIN_BALANCE_CREDITS: z.coerce.number().default(200),
     BILLING_CREDIT_LABEL     : z.string().default('Tokens'),
     // Set to the string 'false' to meter without blocking anyone.
-    BILLING_ENFORCEMENT      : z.string().default('true'),
+    BILLING_ENFORCEMENT      : z.string().default('false'),
 });
 
 export const config = env.parse(process.env);
