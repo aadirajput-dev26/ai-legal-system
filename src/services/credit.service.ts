@@ -389,6 +389,40 @@ export class CreditService {
         };
     }
 
+    static async grantSignupBonus(args: {
+        organisationId: string;
+        credits: number;
+    }): Promise<void> {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            const periodId = await CreditService.currentPeriodId(client, args.organisationId);
+
+            const applied = await CreditService.append(client, {
+                organisationId: args.organisationId,
+                billingPeriodId: periodId,
+                entryType: 'TOPUP',
+                deltaMicro: args.credits * MICRO,
+                idempotencyKey: `signup_bonus:${args.organisationId}`,
+                reason: 'Signup Bonus Tokens',
+            });
+
+            if (applied !== null && periodId) {
+                await client.query(
+                    `UPDATE billing_periods
+                        SET topped_up_credits = topped_up_credits + $2 WHERE id = $1`,
+                    [periodId, args.credits],
+                );
+            }
+            await client.query('COMMIT');
+        } catch (err) {
+            await client.query('ROLLBACK').catch(() => {});
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
+
     /** Recent ledger entries, newest first — the customer-facing statement. */
     static async statement(organisationId: string, limit = 50) {
         const r = await pool.query(
