@@ -80,7 +80,12 @@ export class CreditService {
             periodStart: p?.period_start ?? null,
             periodEnd: p?.period_end ?? null,
             billingPeriodId: p?.id ?? null,
-            hasSubscription: Boolean(sub.rows[0]),
+            hasSubscription: Boolean(
+                sub.rows[0] &&
+                ['active', 'authenticated', 'pending', 'halted', 'paused'].includes(
+                    sub.rows[0].status?.toLowerCase()
+                )
+            ),
             subscriptionStatus: sub.rows[0]?.status ?? null,
         };
     }
