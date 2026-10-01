@@ -2,6 +2,8 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { CaseRepository } from '../repositories/case.repository.js';
 import { createCollection, deleteCollection } from '../lib/hippocampus.js';
 import { CaseContextService } from '../services/case-context.service.js';
+import { GtwyService } from '../services/gtwy.service.js';
+import { config } from '../lib/config.js';
 
 // ─────────────────────────────────────────────
 // GET /api/v1/organisations/:id/cases
@@ -95,6 +97,7 @@ interface UpdateCaseBody {
     court            ?: string;
     case_number      ?: string;
     case_type        ?: string;
+    facts            ?: string;
     instructions     ?: string;
     next_hearing_date?: string;
     stage            ?: string;
@@ -115,6 +118,7 @@ export async function updateCase(req: FastifyRequest, reply: FastifyReply) {
         court: body.court,
         case_number: body.case_number,
         case_type: body.case_type,
+        facts: body.facts,
         instructions: body.instructions,
         next_hearing_date: body.next_hearing_date,
         stage: body.stage,
@@ -198,5 +202,77 @@ export async function getCaseContext(req: FastifyRequest, reply: FastifyReply) {
     }
 
     return reply.code(200).send({ success: true, data: context });
+}
+
+// ─────────────────────────────────────────────
+// POST /api/v1/cases/:id/process-transcript
+// Extracts facts from a consultation transcript
+// ─────────────────────────────────────────────
+export async function processTranscript(req: FastifyRequest, reply: FastifyReply) {
+    const { id: caseId } = req.params as { id: string };
+    const { transcript } = req.body as { transcript: string };
+
+    if (!transcript || !transcript.trim()) {
+        return reply.code(400).send({ success: false, error: 'Transcript is required' });
+    }
+
+    const c = await CaseRepository.findById(caseId);
+    if (!c) {
+        return reply.code(404).send({ success: false, error: 'Case not found' });
+    }
+
+    try {
+        const agentId = config.GTWY_DRAFT_AGENT_ID || '6aa3f0a03e5db27e9a0661e4';
+        
+        const prompt = `Analyze the following consultation transcript and extract the "Facts of the Case".
+Focus on:
+- Important facts
+- Relevant dates
+- Parties involved
+- Events
+- Any other case-specific information
+
+Return a concise, well-structured summary of these facts. Do not include introductory or concluding conversational filler. Just the facts.
+
+Transcript:
+"""
+${transcript}
+"""`;
+
+        const response = await fetch('https://api.gtwy.ai/api/v2/model/chat/completion', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'pauthkey': config.PAUTHKEY,
+            },
+            body: JSON.stringify({
+                agent_id: agentId,
+                user: prompt,
+                thread_id: `transcript_process_${caseId}_${Date.now()}`,
+                stream: false
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to extract facts: ${response.status} ${errorText}`);
+        }
+
+        const result = await response.json();
+        let newFacts = result?.data?.message || result?.message || result?.response || '';
+        
+        // if facts exist, we can append or replace. We'll append here.
+        let updatedFacts = newFacts;
+        if (c.facts && c.facts.trim()) {
+            updatedFacts = `${c.facts}\n\n--- Additional Facts from Transcript ---\n${newFacts}`;
+        }
+
+        const updatedCase = await CaseRepository.update(caseId, { facts: updatedFacts });
+
+        return reply.code(200).send({ success: true, data: updatedCase });
+    } catch (err: any) {
+        console.error('Process transcript error:', err);
+        return reply.code(500).send({ success: false, error: err.message });
+    }
 }
 

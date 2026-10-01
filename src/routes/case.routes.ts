@@ -39,6 +39,7 @@ export async function caseRoutes(app: FastifyInstance) {
     app.get('/cases/:id/context', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseController.getCaseContext);
     app.get('/case/:id/context',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseController.getCaseContext);
     app.patch('/cases/:id',       { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, caseController.updateCase);
+    app.post('/cases/:id/process-transcript', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR']), checkCredits] }, caseController.processTranscript);
     app.delete('/cases/:id',      { preHandler: [authenticate, requireCaseRole(['ADMIN'])] }, caseController.deleteCase);
 
     // ── Case Member Management ─────────────────────────────────────

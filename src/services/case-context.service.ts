@@ -21,6 +21,7 @@ export interface CaseContextResult {
     caseNumber: string;
     court: string;
     caseType: string;
+    caseFacts: string;
     stage: string;
     judge: string;
     status: string;
@@ -191,6 +192,7 @@ export class CaseContextService {
         const caseNumber = caseRecord.case_number || '';
         const court = caseRecord.court || '';
         const caseType = caseRecord.case_type || '';
+        const caseFacts = caseRecord.facts || '';
         const stage = caseRecord.stage || '';
         const judge = caseRecord.judge || '';
         const status = caseRecord.status || '';
@@ -213,6 +215,7 @@ export class CaseContextService {
             court: court || 'N/A',
             caseNumber: caseNumber || 'N/A',
             caseType: caseType || 'N/A',
+            caseFacts: caseFacts || 'No specific facts established yet.',
             stage: stage || 'N/A',
             status,
             clientName: clientName || 'Client',
@@ -238,6 +241,7 @@ export class CaseContextService {
             caseNumber,
             court,
             caseType,
+            caseFacts,
             stage,
             judge,
             status,
