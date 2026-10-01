@@ -101,6 +101,7 @@ interface UpdateCaseBody {
     judge            ?: string;
     client_name      ?: string;
     opposing_party   ?: string;
+    contact_details  ?: any;
 }
 
 export async function updateCase(req: FastifyRequest, reply: FastifyReply) {
@@ -120,6 +121,7 @@ export async function updateCase(req: FastifyRequest, reply: FastifyReply) {
         judge: body.judge,
         client_name: body.client_name,
         opposing_party: body.opposing_party,
+        contact_details: body.contact_details,
     });
 
     if (!c) {

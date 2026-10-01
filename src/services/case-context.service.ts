@@ -5,6 +5,7 @@ import { TaskRepository } from '../repositories/task.repository.js';
 import { ToolRepository } from '../repositories/tool.repository.js';
 import { CaseMemberRepository } from '../repositories/case-member.repository.js';
 import { GtwyService } from './gtwy.service.js';
+import { FeeRepository } from '../repositories/fee.repository.js';
 
 export interface CaseContextResult {
     // Template Variables (exact match to GTWY variables)
@@ -35,6 +36,8 @@ export interface CaseContextResult {
     tools: any[];
     documents: any[];
     members: any[];
+    fees: any;
+    communications: any[];
 
     // Summaries
     summaries: {
@@ -42,6 +45,8 @@ export interface CaseContextResult {
         tasksSummary: string;
         documentsSummary: string;
         toolsSummary: string;
+        feesSummary: string;
+        communicationsSummary: string;
     };
 
     // Full variables map for agent / prompt injection
@@ -144,6 +149,41 @@ export class CaseContextService {
             console.error('[CaseContextService] Failed to fetch members:', err);
         }
 
+        // 7. Fetch Fees
+        let fees: any = { summary: null, milestones: [], payments: [] };
+        let feesSummary = 'No fee information recorded.';
+        try {
+            const summary = await FeeRepository.getFeesSummary(caseId);
+            const milestones = await FeeRepository.getMilestones(caseId);
+            const payments = await FeeRepository.getPayments(caseId);
+            fees = { summary, milestones, payments };
+            
+            if (summary && summary.total_agreed_fee > 0) {
+                feesSummary = `Total Agreed: ${summary.total_agreed_fee}, Received: ${summary.total_received}, Outstanding: ${summary.outstanding_balance}`;
+            }
+        } catch (err) {
+            console.error('[CaseContextService] Failed to fetch fees:', err);
+        }
+
+        // 8. Fetch Case Communications
+        let communications: any[] = [];
+        let communicationsSummary = 'No case communications recorded.';
+        try {
+            const commsResult = await pool.query(
+                'SELECT * FROM case_communications WHERE case_id = $1 ORDER BY sent_at DESC LIMIT 10',
+                [caseId]
+            );
+            communications = commsResult.rows;
+            if (communications.length > 0) {
+                communicationsSummary = communications
+                    .map((c, i) => `${i + 1}. [${new Date(c.sent_at).toISOString().split('T')[0]}] To: ${c.recipient_email} (${c.recipient_role}) - Template: ${c.template_key}`)
+                    .join('\\n');
+            }
+        } catch (err) {
+            console.error('[CaseContextService] Failed to fetch communications:', err);
+        }
+
+
         const caseName = caseRecord.title || '';
         const caseDescription = caseRecord.description || '';
         const caseInstructions = caseRecord.instructions || '';
@@ -182,6 +222,8 @@ export class CaseContextService {
             hearingHistory: hearingsSummary,
             tasksSummary,
             caseDocuments: documentsSummary,
+            feesSummary,
+            communicationsSummary,
         };
 
         return {
@@ -210,12 +252,16 @@ export class CaseContextService {
             tools: toolsList,
             documents: rawResources.length > 0 ? rawResources : formattedResources,
             members,
+            fees,
+            communications,
 
             summaries: {
                 hearingsSummary,
                 tasksSummary,
                 documentsSummary,
                 toolsSummary: availableTools,
+                feesSummary,
+                communicationsSummary,
             },
 
             variables,

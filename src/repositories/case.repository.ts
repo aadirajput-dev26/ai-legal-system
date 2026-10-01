@@ -25,6 +25,7 @@ export interface CaseWithRoleRow {
     next_hearing_date: string | null;
     created_at: string;
     updated_at: string;
+    contact_details: any;
     role: string;
 }
 
@@ -47,6 +48,7 @@ export interface CaseDetailsRow {
     opposing_party: string | null;
     created_at: string;
     updated_at: string;
+    contact_details: any;
 }
 
 export interface UpdateCaseParams {
@@ -62,6 +64,7 @@ export interface UpdateCaseParams {
     judge?: string;
     client_name?: string;
     opposing_party?: string;
+    contact_details?: any;
 }
 
 export interface CaseUpdateResultRow {
@@ -76,6 +79,7 @@ export interface CaseUpdateResultRow {
     judge: string | null;
     client_name: string | null;
     opposing_party: string | null;
+    contact_details: any;
     updated_at: string;
 }
 
@@ -84,7 +88,7 @@ export class CaseRepository {
         const result = await pool.query<CaseWithRoleRow>(
             `SELECT c.id, c.organisation_id, c.collection_id, c.title, c.description, c.status, c.case_number, c.court, c.case_type,
                     c.stage, c.judge, c.client_name, c.opposing_party, c.filing_date,
-                    c.next_hearing_date, c.created_at, c.updated_at, COALESCE(cm.role, 'ADMIN') as role
+                    c.next_hearing_date, c.created_at, c.updated_at, c.contact_details, COALESCE(cm.role, 'ADMIN') as role
              FROM cases c
              JOIN organisation_members om ON c.organisation_id = om.organisation_id AND om.user_id = $2
              LEFT JOIN case_members cm ON cm.case_id = c.id AND cm.user_id = $2
@@ -158,7 +162,7 @@ export class CaseRepository {
     static async findById(caseId: string): Promise<CaseDetailsRow | null> {
         const result = await pool.query<CaseDetailsRow>(
             `SELECT id, organisation_id, title, description, status, case_number, court, case_type, instructions,
-                    collection_id, filing_date, next_hearing_date, stage, judge, client_name, opposing_party, created_at, updated_at
+                    collection_id, filing_date, next_hearing_date, stage, judge, client_name, opposing_party, created_at, updated_at, contact_details
              FROM cases WHERE id = $1`,
             [caseId]
         );
@@ -218,6 +222,10 @@ export class CaseRepository {
             fields.push(`opposing_party = $${idx++}`);
             values.push(updates.opposing_party);
         }
+        if (updates.contact_details != null) {
+            fields.push(`contact_details = $${idx++}`);
+            values.push(updates.contact_details);
+        }
 
         if (fields.length === 0) {
             return null;
@@ -228,7 +236,7 @@ export class CaseRepository {
 
         const result = await pool.query<CaseUpdateResultRow>(
             `UPDATE cases SET ${fields.join(', ')} WHERE id = $${idx}
-             RETURNING id, title, description, status, case_number, court, instructions, next_hearing_date, stage, judge, client_name, opposing_party, updated_at`,
+             RETURNING id, title, description, status, case_number, court, instructions, next_hearing_date, stage, judge, client_name, opposing_party, contact_details, updated_at`,
             values
         );
 
