@@ -2,16 +2,7 @@ import pool from '../lib/db.js';
 
 // ── Types ──────────────────────────────────────────────────────────
 
-export type DraftType =
-    | 'LEGAL_NOTICE'
-    | 'APPLICATION'
-    | 'AFFIDAVIT'
-    | 'REPLY'
-    | 'EMAIL'
-    | 'WHATSAPP'
-    | 'COURT_DRAFT'
-    | 'CORRESPONDENCE'
-    | 'OTHER';
+export type DraftType = string;
 
 export type DraftStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED';
 
