@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { GtwyService } from '../services/gtwy.service.js';
 import { CaseRepository } from '../repositories/case.repository.js';
+import { EmailService } from '../services/email.service.js';
 
 export const createDocument = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const caseId = req.params.id;
@@ -120,6 +121,19 @@ export const getDocument = async (req: FastifyRequest<{ Params: { id: string; re
         const data = await GtwyService.getResource(resourceId);
         const normalized = data ? { ...data, type: normalizeDocType(data) } : data;
         return reply.send({ success: true, data: normalized });
+    } catch (err: any) {
+        return reply.status(500).send({ error: err.message });
+    }
+};
+
+export const getDocumentChunks = async (req: FastifyRequest<{ Params: { id: string; resourceId: string } }>, reply: FastifyReply) => {
+    try {
+        const { id: caseId, resourceId } = req.params;
+        const caseObj = await CaseRepository.findById(caseId);
+        if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+
+        const data = await GtwyService.getResourceChunks(resourceId);
+        return reply.send({ success: true, data });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
     }
@@ -257,5 +271,30 @@ export const listOrgDocuments = async (req: FastifyRequest, reply: FastifyReply)
         return reply.send({ success: true, data: allDocs, cases });
     } catch (err: any) {
         return reply.status(500).send({ error: err.message });
+    }
+};
+
+export const serveDocument = async (req: FastifyRequest<{ Params: { id: string, resourceId: string } }>, reply: FastifyReply) => {
+    const caseId = req.params.id;
+    const resourceId = req.params.resourceId;
+    
+    const caseObj = await CaseRepository.findById(caseId);
+    if (!caseObj) return reply.status(404).send({ error: 'Case not found' });
+    if (!caseObj.collection_id) return reply.status(400).send({ error: 'Case has no Hippocampus collection mapped to it.' });
+
+    try {
+        const response = await GtwyService.getResource(resourceId);
+        const docData = response.data || response;
+        
+        const userId = (req as any).user?.id || null;
+        
+        // Asynchronously send email without blocking
+        EmailService.sendDocumentServed(caseId, docData, caseObj, userId).catch(err => {
+            console.error('Document serve dispatch failed:', err);
+        });
+
+        return reply.send({ success: true, message: 'Document is being served to opposite counsel.' });
+    } catch (err) {
+        throw err;
     }
 };
