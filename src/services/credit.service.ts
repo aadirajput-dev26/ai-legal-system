@@ -80,7 +80,12 @@ export class CreditService {
             periodStart: p?.period_start ?? null,
             periodEnd: p?.period_end ?? null,
             billingPeriodId: p?.id ?? null,
-            hasSubscription: Boolean(sub.rows[0]),
+            hasSubscription: Boolean(
+                sub.rows[0] &&
+                ['active', 'authenticated', 'pending', 'halted', 'paused'].includes(
+                    sub.rows[0].status?.toLowerCase()
+                )
+            ),
             subscriptionStatus: sub.rows[0]?.status ?? null,
         };
     }
@@ -387,6 +392,40 @@ export class CreditService {
                 operations: r.operations,
             })),
         };
+    }
+
+    static async grantSignupBonus(args: {
+        organisationId: string;
+        credits: number;
+    }): Promise<void> {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            const periodId = await CreditService.currentPeriodId(client, args.organisationId);
+
+            const applied = await CreditService.append(client, {
+                organisationId: args.organisationId,
+                billingPeriodId: periodId,
+                entryType: 'TOPUP',
+                deltaMicro: args.credits * MICRO,
+                idempotencyKey: `signup_bonus:${args.organisationId}`,
+                reason: 'Signup Bonus Tokens',
+            });
+
+            if (applied !== null && periodId) {
+                await client.query(
+                    `UPDATE billing_periods
+                        SET topped_up_credits = topped_up_credits + $2 WHERE id = $1`,
+                    [periodId, args.credits],
+                );
+            }
+            await client.query('COMMIT');
+        } catch (err) {
+            await client.query('ROLLBACK').catch(() => {});
+            throw err;
+        } finally {
+            client.release();
+        }
     }
 
     /** Recent ledger entries, newest first — the customer-facing statement. */
