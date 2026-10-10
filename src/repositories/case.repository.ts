@@ -14,6 +14,7 @@ export interface CaseWithRoleRow {
     title: string;
     description: string | null;
     status: string;
+    facts: string | null;
     case_number: string | null;
     court: string | null;
     case_type: string | null;
@@ -25,6 +26,7 @@ export interface CaseWithRoleRow {
     next_hearing_date: string | null;
     created_at: string;
     updated_at: string;
+    contact_details: any;
     role: string;
 }
 
@@ -37,6 +39,7 @@ export interface CaseDetailsRow {
     case_number: string | null;
     court: string | null;
     case_type: string | null;
+    facts: string | null;
     instructions: string | null;
     collection_id: string | null;
     filing_date: string | null;
@@ -47,6 +50,7 @@ export interface CaseDetailsRow {
     opposing_party: string | null;
     created_at: string;
     updated_at: string;
+    contact_details: any;
 }
 
 export interface UpdateCaseParams {
@@ -56,12 +60,14 @@ export interface UpdateCaseParams {
     court?: string;
     case_number?: string;
     case_type?: string;
+    facts?: string;
     instructions?: string;
     next_hearing_date?: string;
     stage?: string;
     judge?: string;
     client_name?: string;
     opposing_party?: string;
+    contact_details?: any;
 }
 
 export interface CaseUpdateResultRow {
@@ -70,12 +76,14 @@ export interface CaseUpdateResultRow {
     status: string;
     case_number: string | null;
     court: string | null;
+    facts: string | null;
     instructions: string | null;
     next_hearing_date: string | null;
     stage: string | null;
     judge: string | null;
     client_name: string | null;
     opposing_party: string | null;
+    contact_details: any;
     updated_at: string;
 }
 
@@ -83,8 +91,8 @@ export class CaseRepository {
     static async listByUserAndOrg(orgId: string, userId: string): Promise<CaseWithRoleRow[]> {
         const result = await pool.query<CaseWithRoleRow>(
             `SELECT c.id, c.organisation_id, c.collection_id, c.title, c.description, c.status, c.case_number, c.court, c.case_type,
-                    c.stage, c.judge, c.client_name, c.opposing_party, c.filing_date,
-                    c.next_hearing_date, c.created_at, c.updated_at, COALESCE(cm.role, 'ADMIN') as role
+                    c.stage, c.judge, c.client_name, c.opposing_party, c.filing_date, c.facts,
+                    c.next_hearing_date, c.created_at, c.updated_at, c.contact_details, COALESCE(cm.role, 'ADMIN') as role
              FROM cases c
              JOIN organisation_members om ON c.organisation_id = om.organisation_id AND om.user_id = $2
              LEFT JOIN case_members cm ON cm.case_id = c.id AND cm.user_id = $2
@@ -157,8 +165,8 @@ export class CaseRepository {
 
     static async findById(caseId: string): Promise<CaseDetailsRow | null> {
         const result = await pool.query<CaseDetailsRow>(
-            `SELECT id, organisation_id, title, description, status, case_number, court, case_type, instructions,
-                    collection_id, filing_date, next_hearing_date, stage, judge, client_name, opposing_party, created_at, updated_at
+            `SELECT id, organisation_id, title, description, status, case_number, court, case_type, instructions, facts,
+                    collection_id, filing_date, next_hearing_date, stage, judge, client_name, opposing_party, created_at, updated_at, contact_details
              FROM cases WHERE id = $1`,
             [caseId]
         );
@@ -194,6 +202,10 @@ export class CaseRepository {
             fields.push(`case_type = $${idx++}`);
             values.push(updates.case_type);
         }
+        if (updates.facts != null) {
+            fields.push(`facts = $${idx++}`);
+            values.push(updates.facts);
+        }
         if (updates.instructions != null) {
             fields.push(`instructions = $${idx++}`);
             values.push(updates.instructions);
@@ -218,6 +230,10 @@ export class CaseRepository {
             fields.push(`opposing_party = $${idx++}`);
             values.push(updates.opposing_party);
         }
+        if (updates.contact_details != null) {
+            fields.push(`contact_details = $${idx++}`);
+            values.push(updates.contact_details);
+        }
 
         if (fields.length === 0) {
             return null;
@@ -228,7 +244,7 @@ export class CaseRepository {
 
         const result = await pool.query<CaseUpdateResultRow>(
             `UPDATE cases SET ${fields.join(', ')} WHERE id = $${idx}
-             RETURNING id, title, description, status, case_number, court, instructions, next_hearing_date, stage, judge, client_name, opposing_party, updated_at`,
+             RETURNING id, title, description, status, case_number, court, facts, instructions, next_hearing_date, stage, judge, client_name, opposing_party, contact_details, updated_at`,
             values
         );
 

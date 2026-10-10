@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { OrganisationRepository } from '../repositories/organisation.repository.js';
+import { CreditService } from '../services/credit.service.js';
 
 // ─────────────────────────────────────────────
 // GET /api/v1/organisations
@@ -25,6 +26,13 @@ export async function createOrganisation(req: FastifyRequest, reply: FastifyRepl
 
     try {
         const org = await OrganisationRepository.create(name, description ?? null, userId);
+        
+        // Grant 10k sign-up bonus credits
+        await CreditService.grantSignupBonus({
+            organisationId: org.id,
+            credits: 10000
+        });
+
         return reply.code(201).send({ success: true, data: org });
     } catch (err) {
         throw err;

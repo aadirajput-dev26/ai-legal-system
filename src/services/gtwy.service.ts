@@ -165,6 +165,23 @@ export class GtwyService {
         return response.json();
     }
 
+    static async getResourceChunks(resourceId: string) {
+        const url = `${config.HIPPOCAMPUS_HOST_URL}/resource/${resourceId}/chunks`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'x-api-key': config.GTWY_PAUTHKEY,
+            },
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch resource chunks: ${response.status} ${errorText}`);
+        }
+
+        return response.json();
+    }
+
     static async getResourcesByCase(collectionId: string, useCache: boolean = true) {
         if (useCache) {
             const cached = resourcesCache.get(collectionId);

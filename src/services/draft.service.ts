@@ -29,8 +29,8 @@ export class DraftService {
         };
 
         const userMessage = draftInstructions && draftInstructions.trim()
-            ? `Generate a professional ${draftTypeLabel} for this case. Specific instructions: ${draftInstructions}`
-            : `Generate a professional ${draftTypeLabel} for this case. Follow standard Indian legal notice/draft formatting, include all legal grounds, relief sought, demand timeline, reserved rights, and placeholder fields in brackets (e.g. [Date], [Accused Name], [Deceased Name], [Address], [Location], [Age], [Beneficiary details], [Court], etc.) where appropriate particulars are to be filled.`;
+            ? `Generate a professional ${draftTypeLabel} for this case. Specific instructions: ${draftInstructions}. Use the provided caseFacts to tailor the draft contextually.`
+            : `Generate a professional ${draftTypeLabel} for this case. Follow standard Indian legal notice/draft formatting, include all legal grounds, relief sought, demand timeline, reserved rights, and placeholder fields in brackets (e.g. [Date], [Accused Name], [Deceased Name], [Address], [Location], [Age], [Beneficiary details], [Court], etc.) where appropriate particulars are to be filled. Make sure to use the provided caseFacts to incorporate relevant dates, parties, and events.`;
 
         return GtwyService.sendMessageStream(
             this.getAgentId(),
@@ -80,7 +80,7 @@ ${currentContent}
 Lawyer's Instruction:
 ${refinementPrompt}
 
-Please update the document according to the instruction while maintaining legal precision, formal formatting, and consistent placeholder fields. Output the revised document.`;
+Please update the document according to the instruction while maintaining legal precision, formal formatting, and consistent placeholder fields. Use the caseFacts provided in variables to ensure accurate dates, events, and parties. Output the revised document.`;
         }
 
         return GtwyService.sendMessageStream(

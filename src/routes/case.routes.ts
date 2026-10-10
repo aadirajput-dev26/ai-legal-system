@@ -10,6 +10,7 @@ import * as hearingController from '../controllers/hearing.controller.js';
 import * as toolController from '../controllers/tool.controller.js';
 import * as taskController from '../controllers/task.controller.js';
 import * as draftController from '../controllers/draft.controller.js';
+import * as feeController from '../controllers/fee.controller.js';
 
 export async function caseRoutes(app: FastifyInstance) {
     // ── Cases within an Org ────────────────────────────────────────
@@ -38,6 +39,7 @@ export async function caseRoutes(app: FastifyInstance) {
     app.get('/cases/:id/context', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseController.getCaseContext);
     app.get('/case/:id/context',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, caseController.getCaseContext);
     app.patch('/cases/:id',       { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, caseController.updateCase);
+    app.post('/cases/:id/process-transcript', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR']), checkCredits] }, caseController.processTranscript);
     app.delete('/cases/:id',      { preHandler: [authenticate, requireCaseRole(['ADMIN'])] }, caseController.deleteCase);
 
     // ── Case Member Management ─────────────────────────────────────
@@ -49,9 +51,11 @@ export async function caseRoutes(app: FastifyInstance) {
     // ── Case Documents ─────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/documents', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, documentController.listDocuments);
     app.get<{ Params: { id: string; resourceId: string } }>('/cases/:id/documents/:resourceId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, documentController.getDocument);
+    app.get<{ Params: { id: string; resourceId: string } }>('/cases/:id/documents/:resourceId/chunks', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, documentController.getDocumentChunks);
     app.post<{ Params: { id: string } }>('/cases/:id/documents', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, documentController.createDocument);
     app.patch<{ Params: { id: string; resourceId: string } }>('/cases/:id/documents/:resourceId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, documentController.updateDocument);
     app.delete<{ Params: { id: string; resourceId: string } }>('/cases/:id/documents/:resourceId', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, documentController.deleteDocument);
+    app.post<{ Params: { id: string; resourceId: string } }>('/cases/:id/documents/:resourceId/serve', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, documentController.serveDocument);
 
     // ── Chat & Orchestrator ────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/chats', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, chatController.listChats);
@@ -62,6 +66,12 @@ export async function caseRoutes(app: FastifyInstance) {
     // ── Hearings ───────────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/hearings',  { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, hearingController.listHearings);
     app.post<{ Params: { id: string } }>('/cases/:id/hearings', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, hearingController.createHearing);
+
+    // ── Fees ───────────────────────────────────────────────────────
+    app.get<{ Params: { id: string } }>('/cases/:id/fees', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, feeController.getFeesSummary);
+    app.post<{ Params: { id: string } }>('/cases/:id/fees/schedule', { preHandler: [authenticate, requireCaseRole(['ADMIN'])] }, feeController.updateFeeSchedule);
+    app.post<{ Params: { id: string } }>('/cases/:id/fees/milestones', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, feeController.createMilestone);
+    app.post<{ Params: { id: string } }>('/cases/:id/fees/payments', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR'])] }, feeController.recordPayment);
 
     // ── Tasks ──────────────────────────────────────────────────────
     app.get<{ Params: { id: string } }>('/cases/:id/tasks', { preHandler: [authenticate, requireCaseRole(['ADMIN', 'EDITOR', 'VIEWER'])] }, taskController.listTasks);
