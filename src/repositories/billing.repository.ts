@@ -115,6 +115,18 @@ export class BillingRepository {
 
     // ── Subscriptions ───────────────────────────────────────────────
 
+    /** Cancel any unauthenticated 'created' subscriptions so a fresh checkout session can proceed */
+    static async cancelPendingCreatedSubscriptions(organisationId: string): Promise<string[]> {
+        const r = await pool.query(
+            `UPDATE subscriptions
+                SET status = 'cancelled', updated_at = now()
+              WHERE organisation_id = $1 AND status = 'created'
+          RETURNING razorpay_subscription_id`,
+            [organisationId],
+        );
+        return r.rows.map(row => row.razorpay_subscription_id).filter(Boolean);
+    }
+
     static async upsertSubscription(args: {
         organisationId: string;
         planId: string;
