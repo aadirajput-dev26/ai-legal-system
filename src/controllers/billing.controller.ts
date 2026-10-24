@@ -153,6 +153,18 @@ export const subscribe = async (req: FastifyRequest, reply: FastifyReply) => {
         const plan = await BillingRepository.findPlanByCode(planCode || 'PRO');
         if (!plan) return fail(reply, 404, 'PLAN_NOT_FOUND', 'That plan does not exist.');
 
+        // Prevent double subscription if already on an active plan
+        const liveSub = await BillingRepository.findLiveSubscription(org.id);
+        if (liveSub) {
+            return fail(reply, 409, 'ALREADY_SUBSCRIBED', 'This organisation already has an active subscription.');
+        }
+
+        // Cancel previous incomplete / abandoned 'created' subscriptions so they don't block fresh checkout
+        const staleIds = await BillingRepository.cancelPendingCreatedSubscriptions(org.id);
+        for (const staleId of staleIds) {
+            RazorpayService.cancelSubscription(staleId, false).catch(() => {});
+        }
+
         // Lazily create the Razorpay plan the first time it is needed.
         let razorpayPlanId = plan.razorpay_plan_id;
         if (!razorpayPlanId) {
@@ -187,7 +199,9 @@ export const subscribe = async (req: FastifyRequest, reply: FastifyReply) => {
         });
     } catch (err: any) {
         req.log.error(err);
-        return fail(reply, 502, 'RAZORPAY_ERROR', err.message);
+        const status = err.statusCode || err.status || 500;
+        const code = err.code === '23505' ? 'SUBSCRIPTION_CONFLICT' : (err.code || 'RAZORPAY_ERROR');
+        return fail(reply, status >= 400 && status < 600 ? status : 502, code, err.message);
     }
 };
 
