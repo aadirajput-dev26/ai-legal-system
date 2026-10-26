@@ -17,6 +17,8 @@ const env = z.object({
     PAUTHKEY:z.string().min(1),
     GTWY_DRAFT_AGENT_ID      : z.string().default('6aa3f0a03e5db27e9a0661e4'),
     CORS_ORIGINS             : z.string().optional(),
+    GOOGLE_CLIENT_ID         : z.string().optional(),
+    EMAIL_VERIFY_WEBHOOK_URL : z.string().url().default('https://flow.sokt.io/func/scriV6mk16qc'),
 
     // ── Billing ────────────────────────────────────────────────────
     // Optional so the server still boots before Razorpay is set up; the

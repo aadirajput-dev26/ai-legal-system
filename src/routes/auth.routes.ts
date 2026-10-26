@@ -6,6 +6,9 @@ export async function authRoutes(app: FastifyInstance) {
     // Public routes (no auth required)
     app.post('/signup', authController.signup);
     app.post('/login',  authController.login);
+    app.post('/google', authController.googleAuth);
+    app.post('/send-verification-email', authController.sendVerificationEmail);
+    app.post('/verify-email', authController.verifyEmail);
     app.post('/refresh', authController.refresh);
 
     // Authenticated routes

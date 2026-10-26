@@ -27,12 +27,12 @@ export class UserRepository {
         return result.rows.length > 0;
     }
 
-    static async create(name: string, email: string, passwordHash: string): Promise<UserRow> {
+    static async create(name: string, email: string, passwordHash: string, avatar?: string | null): Promise<UserRow> {
         const result = await pool.query<UserRow>(
-            `INSERT INTO users (name, email, password_hash)
-             VALUES ($1, $2, $3)
+            `INSERT INTO users (name, email, password_hash, avatar)
+             VALUES ($1, $2, $3, $4)
              RETURNING id, name, email`,
-            [name, email.toLowerCase(), passwordHash]
+            [name, email.toLowerCase(), passwordHash, avatar || null]
         );
         return result.rows[0];
     }
