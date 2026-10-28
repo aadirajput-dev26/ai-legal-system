@@ -7,6 +7,8 @@ import { CreditService } from '../services/credit.service.js';
 import { config } from '../lib/config.js';
 import type { JwtPayload } from '../types/index.js';
 
+import { EmailService } from '../services/email.service.js';
+
 // In-memory revocation store for refresh tokens.
 // Swap this Set for a Redis SET when Redis is added to the stack.
 const revokedRefreshTokens = new Set<string>();
@@ -35,63 +37,19 @@ export function validatePassword(password: string): string | null {
 }
 
 /**
- * Send branded verification email via configured webhook
+ * Send branded verification email via configured webhook using template in email/templates/verify-email.html
  */
-export async function sendEmailVerificationWebhook(email: string, name: string) {
+export async function sendEmailVerificationWebhook(email: string, name: string, token?: string) {
     const webhookUrl = config.EMAIL_VERIFY_WEBHOOK_URL || 'https://flow.sokt.io/func/scriV6mk16qc';
-    const verifyUrl = `https://legaldesk.co.in/verify?email=${encodeURIComponent(email)}`;
+    const frontendUrl = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production' ? 'https://legaldesk.co.in' : 'http://localhost:3000');
+    const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
+    const verifyUrl = `${frontendUrl}/verify?email=${encodeURIComponent(email)}${tokenQuery}`;
 
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Verify your LegalDesk email</title>
-</head>
-<body style="margin:0;padding:0;background:#F8F9FA;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F9FA;padding:40px 16px;">
-  <tr><td align="center">
-    <table width="560" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;max-width:560px;width:100%;">
-      <tr>
-        <td style="background:#111111;padding:32px 40px;text-align:center;">
-          <p style="margin:0;font-size:22px;font-weight:bold;color:#FFFFFF;letter-spacing:-0.02em;">Legal<span style="color:#2dd4bf;">Desk</span></p>
-          <p style="margin:8px 0 0;font-size:13px;color:#A1A1AA;">AI Legal Case Management</p>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:40px 40px 32px;">
-          <h1 style="margin:0 0 8px;font-size:24px;font-weight:bold;color:#111111;letter-spacing:-0.02em;">Verify your email address</h1>
-          <p style="margin:0 0 24px;font-size:15px;color:#666666;line-height:1.6;">Hi ${name || 'there'},</p>
-          <p style="margin:0 0 24px;font-size:15px;color:#666666;line-height:1.6;">
-            Welcome to LegalDesk! Click the button below to verify your email address and complete your account setup.
-          </p>
-          <table cellpadding="0" cellspacing="0" style="margin:0 0 32px;">
-            <tr>
-              <td style="background:#111111;border-radius:10px;">
-                <a href="${verifyUrl}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:bold;color:#FFFFFF;text-decoration:none;letter-spacing:-0.01em;">
-                  Verify Email Address →
-                </a>
-              </td>
-            </tr>
-          </table>
-          <p style="margin:0 0 8px;font-size:13px;color:#999999;">Or copy and paste this link into your browser:</p>
-          <p style="margin:0 0 24px;font-size:12px;color:#111111;word-break:break-all;background:#F8F9FA;padding:12px;border-radius:8px;border:1px solid #E5E7EB;">${verifyUrl}</p>
-          <p style="margin:0;font-size:13px;color:#999999;line-height:1.6;">
-            This link expires in <strong style="color:#111111;">30 minutes</strong> and can only be used once.<br />
-            If you didn't create a LegalDesk account, you can safely ignore this email.
-          </p>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:24px 40px;border-top:1px solid #E5E7EB;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#999999;">© ${new Date().getFullYear()} LegalDesk. All rights reserved.</p>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
+    const html = EmailService.compileTemplate('verify-email', {
+        name: name || 'Counsel',
+        verifyUrl,
+        year: new Date().getFullYear().toString(),
+    });
 
     try {
         await fetch(webhookUrl, {
@@ -114,7 +72,7 @@ export async function sendEmailVerificationWebhook(email: string, name: string) 
 interface SignupBody {
     name        : string;
     email       : string;
-    password    : string;
+    password   ?: string;
     accountType?: 'individual' | 'firm';
     mobile      ?: string;
     state       ?: string;
@@ -126,26 +84,28 @@ interface SignupBody {
 export async function signup(req: FastifyRequest, reply: FastifyReply) {
     const { name, email, password, accountType, firmName } = req.body as SignupBody;
 
-    if (!name || !email || !password) {
+    if (!name || !email) {
         return reply.code(400).send({
             success: false,
             error: {
                 code   : 'MISSING_REQUIRED_FIELDS',
-                message: 'Name, email, and password are required.',
+                message: 'Name and email are required.',
             },
         });
     }
 
-    // Password validation (8 chars, mixed case, number, special char)
-    const passwordError = validatePassword(password);
-    if (passwordError) {
-        return reply.code(400).send({
-            success: false,
-            error: {
-                code   : 'INVALID_PASSWORD',
-                message: passwordError,
-            },
-        });
+    // Optional password validation (if provided)
+    if (password && password.trim().length > 0) {
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            return reply.code(400).send({
+                success: false,
+                error: {
+                    code   : 'INVALID_PASSWORD',
+                    message: passwordError,
+                },
+            });
+        }
     }
 
     // Check for existing account
@@ -160,7 +120,10 @@ export async function signup(req: FastifyRequest, reply: FastifyReply) {
         });
     }
 
-    const password_hash = await bcrypt.hash(password, 12);
+    const password_hash = (password && password.trim().length > 0)
+        ? await bcrypt.hash(password, 12)
+        : await bcrypt.hash(crypto.randomUUID() + '_no_password_set', 12);
+
     const user = await UserRepository.create(name, email, password_hash);
 
     // Automatically create default organisation and grant sign-up credits
@@ -178,13 +141,39 @@ export async function signup(req: FastifyRequest, reply: FastifyReply) {
         console.error('[auth] Failed to create initial organisation on signup:', orgErr);
     }
 
-    // Dispatch verification email via webhook
-    sendEmailVerificationWebhook(email, name).catch(() => {});
+    // Generate verification token
+    const verificationToken = req.server.jwt.sign(
+        { userId: user.id, email: user.email, name: user.name },
+        { expiresIn: '7d' }
+    );
 
-    return reply.code(201).send({
-        success: true,
-        data   : { id: user.id, name: user.name, email: user.email },
-    });
+    // Send verification email via webhook using template
+    await sendEmailVerificationWebhook(email, name, verificationToken);
+
+    const payload: JwtPayload = { userId: user.id, email: user.email, name: user.name };
+    const accessToken = req.server.jwt.sign(payload, { expiresIn: '7d' });
+    const refreshToken = req.server.jwt.sign(
+        payload,
+        { expiresIn: '7d', key: config.JWT_REFRESH_SECRET }
+    );
+
+    reply
+        .setCookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure  : process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path    : '/api/v1/auth/refresh',
+            maxAge  : 7 * 24 * 60 * 60,
+        })
+        .code(201)
+        .send({
+            success: true,
+            data   : {
+                accessToken,
+                verificationToken,
+                user: { id: user.id, name: user.name, email: user.email },
+            },
+        });
 }
 
 // ─────────────────────────────────────────────
@@ -237,6 +226,151 @@ export async function login(req: FastifyRequest, reply: FastifyReply) {
                 user: { id: user.id, name: user.name, email: user.email },
             },
         });
+}
+
+// ─────────────────────────────────────────────
+// GET /api/v1/auth/google/login
+// Redirects the browser to Google's OAuth 2.0 consent page
+// ─────────────────────────────────────────────
+export async function googleLoginRedirect(req: FastifyRequest, reply: FastifyReply) {
+    const clientId = config.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+        return reply.code(500).send({
+            success: false,
+            error: { code: 'GOOGLE_OAUTH_NOT_CONFIGURED', message: 'GOOGLE_CLIENT_ID is not configured on the server.' },
+        });
+    }
+
+    const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${config.PORT}`;
+    const proto = (req.headers['x-forwarded-proto'] as string) || (req.protocol || 'http');
+    const redirectUri = config.GOOGLE_REDIRECT_URI || `${proto}://${host}/api/v1/auth/google/callback`;
+
+    const state = (req.query as any)?.mode || 'login';
+
+    const params = new URLSearchParams({
+        client_id    : clientId,
+        redirect_uri : redirectUri,
+        response_type: 'code',
+        scope        : 'openid email profile',
+        access_type  : 'offline',
+        prompt       : 'select_account',
+        state        : String(state),
+    });
+
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    return reply.redirect(googleAuthUrl);
+}
+
+// ─────────────────────────────────────────────
+// GET /api/v1/auth/google/callback
+// Handles Google OAuth 2.0 callback, exchanges code, issues session, redirects to frontend
+// ─────────────────────────────────────────────
+export async function googleCallback(req: FastifyRequest, reply: FastifyReply) {
+    const { code, error } = req.query as { code?: string; error?: string };
+    const frontendUrl = config.FRONTEND_URL || 'http://localhost:3000';
+
+    if (error || !code) {
+        console.warn('[auth] Google OAuth callback error or missing code:', error);
+        return reply.redirect(`${frontendUrl}/login?error=google_cancelled`);
+    }
+
+    const clientId = config.GOOGLE_CLIENT_ID;
+    const clientSecret = config.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+        console.error('[auth] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET on server.');
+        return reply.redirect(`${frontendUrl}/login?error=google_config_missing`);
+    }
+
+    const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${config.PORT}`;
+    const proto = (req.headers['x-forwarded-proto'] as string) || (req.protocol || 'http');
+    const redirectUri = config.GOOGLE_REDIRECT_URI || `${proto}://${host}/api/v1/auth/google/callback`;
+
+    try {
+        // Exchange authorization code for tokens
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body   : new URLSearchParams({
+                code,
+                client_id    : clientId,
+                client_secret: clientSecret,
+                redirect_uri : redirectUri,
+                grant_type   : 'authorization_code',
+            }),
+        });
+
+        if (!tokenRes.ok) {
+            const errBody = await tokenRes.text();
+            console.error('[auth] Google token exchange failed:', errBody);
+            return reply.redirect(`${frontendUrl}/login?error=google_token_exchange_failed`);
+        }
+
+        const tokenData = await tokenRes.json() as any;
+
+        // Fetch user profile from Google using access token
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+
+        if (!userInfoRes.ok) {
+            console.error('[auth] Failed to fetch Google user profile.');
+            return reply.redirect(`${frontendUrl}/login?error=google_profile_failed`);
+        }
+
+        const profile = await userInfoRes.json() as any;
+        const googleEmail = profile.email;
+        const googleName = profile.name || googleEmail.split('@')[0];
+        const googlePicture = profile.picture;
+
+        if (!googleEmail) {
+            return reply.redirect(`${frontendUrl}/login?error=google_email_missing`);
+        }
+
+        let user = await UserRepository.findByEmail(googleEmail);
+
+        if (!user) {
+            const randomSecret = crypto.randomUUID() + '_google_oauth_no_pwd';
+            const dummyHash = await bcrypt.hash(randomSecret, 12);
+
+            const createdUser = await UserRepository.create(googleName, googleEmail, dummyHash, googlePicture);
+            user = {
+                id           : createdUser.id,
+                name         : createdUser.name,
+                email        : createdUser.email,
+                password_hash: dummyHash,
+            };
+
+            // Create default organization & grant sign-up credits
+            try {
+                const org = await OrganisationRepository.create(`${googleName}'s Practice`, null, user.id);
+                await CreditService.grantSignupBonus({
+                    organisationId: org.id,
+                    credits       : 10000,
+                });
+            } catch (orgErr) {
+                console.error('[auth] Failed to create initial organisation for Google user:', orgErr);
+            }
+        }
+
+        const payload: JwtPayload = { userId: user.id, email: user.email, name: user.name };
+        const accessToken = req.server.jwt.sign(payload, { expiresIn: '7d' });
+        const refreshToken = req.server.jwt.sign(payload, { expiresIn: '7d', key: config.JWT_REFRESH_SECRET });
+
+        reply.setCookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure  : process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path    : '/api/v1/auth/refresh',
+            maxAge  : 7 * 24 * 60 * 60,
+        });
+
+        // Redirect user to frontend auth callback page with access token
+        return reply.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(accessToken)}`);
+    } catch (err) {
+        console.error('[auth] Unexpected error during Google OAuth callback:', err);
+        return reply.redirect(`${frontendUrl}/login?error=google_server_error`);
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -401,6 +535,92 @@ export async function verifyEmail(req: FastifyRequest, reply: FastifyReply) {
             message: 'Email verified successfully.',
         },
     });
+}
+
+// ─────────────────────────────────────────────
+// POST /api/v1/auth/set-password
+// ─────────────────────────────────────────────
+interface SetPasswordBody {
+    token   ?: string;
+    email   ?: string;
+    password?: string;
+}
+
+export async function setPassword(req: FastifyRequest, reply: FastifyReply) {
+    const { token, email, password } = req.body as SetPasswordBody;
+
+    let targetUserId: string | null = null;
+    let targetEmail: string | null = email || null;
+
+    if (token) {
+        try {
+            const payload = req.server.jwt.verify<any>(token);
+            targetUserId = payload.userId;
+            targetEmail = payload.email || targetEmail;
+        } catch {
+            // Token verification fallback
+        }
+    }
+
+    let user: any = null;
+    if (targetUserId) {
+        user = await UserRepository.findById(targetUserId);
+    }
+    if (!user && targetEmail) {
+        user = await UserRepository.findByEmail(targetEmail);
+    }
+
+    if (!user) {
+        return reply.code(404).send({
+            success: false,
+            error: {
+                code   : 'USER_NOT_FOUND',
+                message: 'User account could not be found.',
+            },
+        });
+    }
+
+    // If password provided, validate & update
+    if (password && password.trim().length > 0) {
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            return reply.code(400).send({
+                success: false,
+                error: {
+                    code   : 'INVALID_PASSWORD',
+                    message: passwordError,
+                },
+            });
+        }
+        const password_hash = await bcrypt.hash(password, 12);
+        await UserRepository.updatePassword(user.id, password_hash);
+    }
+
+    // Issue JWT session so user is logged in
+    const payload: JwtPayload = { userId: user.id, email: user.email, name: user.name };
+    const accessToken = req.server.jwt.sign(payload, { expiresIn: '7d' });
+    const refreshToken = req.server.jwt.sign(
+        payload,
+        { expiresIn: '7d', key: config.JWT_REFRESH_SECRET }
+    );
+
+    reply
+        .setCookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure  : process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path    : '/api/v1/auth/refresh',
+            maxAge  : 7 * 24 * 60 * 60,
+        })
+        .code(200)
+        .send({
+            success: true,
+            data   : {
+                accessToken,
+                user: { id: user.id, name: user.name, email: user.email },
+                message: password ? 'Password set and email verified successfully.' : 'Email verified successfully.',
+            },
+        });
 }
 
 // ─────────────────────────────────────────────

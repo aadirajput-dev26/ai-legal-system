@@ -185,12 +185,22 @@ export class UsageService {
         const u = state.usage;
         const { markupMultiplier, fxUsdInr, creditRateMicro } = billingConfig;
 
-        // A turn that produced no usage costs nothing. Record it so the
-        // analytics are honest, but never take credits for it.
-        const chargeable = status === 'COMPLETED' && u?.cost != null;
+        // Fallback cost: if Gateway did not compute cost or returned 0, but total_tokens were used
+        let effectiveCost = u?.cost;
+        if ((effectiveCost == null || Number(effectiveCost) <= 0) && (u?.total_tokens ?? 0) > 0) {
+            // Standard fallback: $0.002 per 1k tokens so token usage is never unmetered
+            effectiveCost = ((u!.total_tokens ?? 0) / 1000) * 0.002;
+        }
+
+        const chargeable = status === 'COMPLETED' && effectiveCost != null && Number(effectiveCost) > 0;
         const priced = chargeable
-            ? UsageService.price(u!.cost)
+            ? UsageService.price(effectiveCost)
             : { underlyingCostMicro: 0, customerValueMicro: 0, creditsConsumedMicro: 0 };
+
+        // Ensure at least 1 micro-credit is consumed if tokens were consumed
+        if (chargeable && (u?.total_tokens ?? 0) > 0 && priced.creditsConsumedMicro === 0) {
+            priced.creditsConsumedMicro = 1000; // 0.001 credit minimum
+        }
 
         const client = await pool.connect();
         try {
@@ -224,7 +234,7 @@ export class UsageService {
                     state.service, state.model, state.agentId, state.messageId, requestId,
                     u?.input_tokens ?? null, u?.output_tokens ?? null, u?.cached_tokens ?? null,
                     u?.reasoning_tokens ?? null, u?.total_tokens ?? null,
-                    u?.cost ?? null, fxUsdInr, priced.underlyingCostMicro,
+                    effectiveCost ?? null, fxUsdInr, priced.underlyingCostMicro,
                     markupMultiplier, priced.customerValueMicro,
                     creditRateMicro, priced.creditsConsumedMicro,
                     status, latencyMs,
@@ -238,14 +248,11 @@ export class UsageService {
                 return;
             }
 
-            // No open billing period means the organisation has never bought a plan.
-            // Record the usage — it still belongs in the analytics — but take no
-            // credits, or the balance would go negative against an allowance that
-            // was never granted, and the billing page would read "-3 of 0".
-            if (chargeable && ctx.organisationId && period && priced.creditsConsumedMicro > 0) {
+            // Deduct tokens from organisation ledger and update period consumption
+            if (chargeable && ctx.organisationId && priced.creditsConsumedMicro > 0) {
                 await CreditService.consume(client, {
                     organisationId: ctx.organisationId,
-                    billingPeriodId: period,
+                    billingPeriodId: period ?? null,
                     usageEventId: inserted.rows[0].id,
                     creditsMicro: priced.creditsConsumedMicro,
                     reason: ctx.feature,
