@@ -28,7 +28,7 @@ export interface Balance {
 }
 
 export class CreditService {
-    /** The open billing period, or null when the org has never subscribed. */
+    /** The open billing period, auto-created if none exists so consumption and metrics track properly. */
     static async currentPeriodId(client: PoolClient, organisationId: string): Promise<string | null> {
         const r = await client.query(
             `SELECT id FROM billing_periods
@@ -36,7 +36,33 @@ export class CreditService {
               ORDER BY period_start DESC LIMIT 1`,
             [organisationId],
         );
-        return r.rows[0]?.id ?? null;
+        if (r.rows[0]?.id) return r.rows[0].id;
+
+        try {
+            const ins = await client.query(
+                `INSERT INTO billing_periods (
+                    organisation_id, period_start, period_end, allocated_credits,
+                    rolled_over_credits, topped_up_credits, consumed_credits_micro, status
+                 ) VALUES (
+                    $1, now(), now() + interval '30 days', 0, 0, 0, 0, 'OPEN'
+                 )
+                 ON CONFLICT DO NOTHING
+                 RETURNING id`,
+                [organisationId]
+            );
+            if (ins.rows[0]?.id) return ins.rows[0].id;
+
+            const retry = await client.query(
+                `SELECT id FROM billing_periods
+                  WHERE organisation_id = $1 AND status = 'OPEN'
+                  ORDER BY period_start DESC LIMIT 1`,
+                [organisationId],
+            );
+            return retry.rows[0]?.id ?? null;
+        } catch (err) {
+            console.warn('[credit] Auto-create period failed:', err);
+            return null;
+        }
     }
 
     /** Current balance in micro-credits. Derived, never cached. */
@@ -51,7 +77,17 @@ export class CreditService {
 
     /** Everything the billing screen needs, in one round trip. */
     static async summary(organisationId: string): Promise<Balance> {
-        const [bal, period, sub] = await Promise.all([
+        // Ensure an open period exists so period info is always available
+        const client = await pool.connect();
+        try {
+            await CreditService.currentPeriodId(client, organisationId);
+        } catch {
+            // Ignore if connection or creation fails
+        } finally {
+            client.release();
+        }
+
+        const [bal, period, sub, ledgerConsumed] = await Promise.all([
             CreditService.balanceMicro(pool, organisationId),
             pool.query(
                 `SELECT id, period_start, period_end, allocated_credits,
@@ -67,16 +103,25 @@ export class CreditService {
                   ORDER BY created_at DESC LIMIT 1`,
                 [organisationId],
             ),
+            pool.query(
+                `SELECT COALESCE(ABS(SUM(delta_credits_micro)), 0)::bigint AS consumed
+                   FROM credit_ledger
+                  WHERE organisation_id = $1 AND delta_credits_micro < 0`,
+                [organisationId],
+            ),
         ]);
 
         const p = period.rows[0];
+        const periodConsumedMicro = Number(p?.consumed_credits_micro ?? 0);
+        const totalConsumedMicro = Math.max(periodConsumedMicro, Number(ledgerConsumed.rows[0]?.consumed ?? 0));
+
         return {
             organisationId,
             balanceMicro: bal,
             balanceCredits: creditsFromMicro(bal),
             allocatedCredits: Number(p?.allocated_credits ?? 0) + Number(p?.rolled_over_credits ?? 0),
             toppedUpCredits: Number(p?.topped_up_credits ?? 0),
-            consumedCredits: creditsFromMicro(Number(p?.consumed_credits_micro ?? 0)),
+            consumedCredits: creditsFromMicro(totalConsumedMicro),
             periodStart: p?.period_start ?? null,
             periodEnd: p?.period_end ?? null,
             billingPeriodId: p?.id ?? null,

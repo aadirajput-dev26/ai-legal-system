@@ -36,4 +36,19 @@ export class UserRepository {
         );
         return result.rows[0];
     }
+
+    static async findById(id: string): Promise<UserRow | null> {
+        const result = await pool.query<UserRow>(
+            'SELECT id, name, email FROM users WHERE id = $1',
+            [id]
+        );
+        return result.rows[0] || null;
+    }
+
+    static async updatePassword(id: string, passwordHash: string): Promise<void> {
+        await pool.query(
+            'UPDATE users SET password_hash = $1 WHERE id = $2',
+            [passwordHash, id]
+        );
+    }
 }
