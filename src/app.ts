@@ -128,11 +128,16 @@ export const App = () => {
     );
 
     // ── Health Check ───────────────────────────────────────────────
-    app.get('/', () => ({
-        success: true,
-        health : 'ok',
-        message: 'AI Legal System API is running.',
-    }));
+    const healthResponse = () => ({
+        success    : true,
+        health     : 'ok',
+        environment: config.environment,
+        message    : 'AI Legal System API is running.',
+    });
+
+    app.get('/', healthResponse);
+    app.get('/health', healthResponse);
+    app.get('/api/v1/health', healthResponse);
 
     // ── Routes ─────────────────────────────────────────────────────
     app.register(authRoutes,         { prefix: '/api/v1/auth' });
