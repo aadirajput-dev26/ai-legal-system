@@ -230,7 +230,14 @@ export class GtwyService {
         }
     }
 
-    static async sendMessageStream(agentId: string, threadId: string, message: string, variables?: Record<string, string>): Promise<Response> {
+    static async sendMessageStream(
+        agentId: string,
+        threadId: string,
+        message: string,
+        variables?: Record<string, string>,
+        environment?: 'dev' | 'production' | string
+    ): Promise<Response> {
+        const env = environment || config.environment;
         const response = await fetch('https://api.gtwy.ai/api/v2/model/chat/completion', {
             method: 'POST',
             headers: {
@@ -242,7 +249,8 @@ export class GtwyService {
                 user: message,
                 thread_id: threadId,
                 variables,
-                stream: true
+                stream: true,
+                environment: env,
             })
         });
 

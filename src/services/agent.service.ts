@@ -6,13 +6,15 @@ export class AgentService {
         caseId: string,
         threadId: string,
         userMessage: string,
-        variables?: Record<string, string>
+        variables?: Record<string, string>,
+        environment?: 'dev' | 'production'
     ): Promise<Response> {
         return GtwyService.sendMessageStream(
             config.GTWY_UNIVERSAL_AGENT_ID,
             threadId,
             userMessage,
-            variables
+            variables,
+            environment || config.environment
         );
     }
 }

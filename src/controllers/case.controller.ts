@@ -249,7 +249,8 @@ ${transcript}
                 agent_id: agentId,
                 user: prompt,
                 thread_id: `transcript_process_${caseId}_${Date.now()}`,
-                stream: false
+                stream: false,
+                environment: config.environment,
             })
         });
 

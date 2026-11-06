@@ -16,6 +16,7 @@ const env = z.object({
     VIASOCKET_PROJECT_ID     : z.string().optional(),
     PAUTHKEY:z.string().min(1),
     GTWY_DRAFT_AGENT_ID      : z.string().default('6aa3f0a03e5db27e9a0661e4'),
+    environment              : z.enum(['dev', 'production']).default('dev'),
     CORS_ORIGINS             : z.string().optional(),
     GOOGLE_CLIENT_ID         : z.string().optional(),
     GOOGLE_CLIENT_SECRET     : z.string().optional(),
@@ -39,3 +40,4 @@ const env = z.object({
 });
 
 export const config = env.parse(process.env);
+
