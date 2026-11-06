@@ -14,7 +14,7 @@ export class AgentService {
             threadId,
             userMessage,
             variables,
-            environment || config.ENVIRONMENT
+            environment || config.environment
         );
     }
 }

@@ -237,7 +237,7 @@ export class GtwyService {
         variables?: Record<string, string>,
         environment?: 'dev' | 'production' | string
     ): Promise<Response> {
-        const env = environment || config.ENVIRONMENT;
+        const env = environment || config.environment;
         const response = await fetch('https://api.gtwy.ai/api/v2/model/chat/completion', {
             method: 'POST',
             headers: {

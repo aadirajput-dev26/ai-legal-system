@@ -250,7 +250,7 @@ ${transcript}
                 user: prompt,
                 thread_id: `transcript_process_${caseId}_${Date.now()}`,
                 stream: false,
-                environment: config.ENVIRONMENT,
+                environment: config.environment,
             })
         });
 
